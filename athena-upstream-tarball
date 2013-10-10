@@ -1,0 +1,163 @@
+#!/usr/bin/python
+
+"""
+Create an Athena redistribution platform for the specified package.
+Not Debian-specific.
+"""
+
+import dabuildsys
+
+import argparse
+import os.path
+import re
+import shutil
+import subprocess
+import sys
+
+# Globals
+quiet = False
+
+def get_version_by_autoconf(rev):
+    """
+    Extract package version number from autoconf files.
+    """
+
+    try:
+        text = rev.read_file("configure.ac")
+    except:
+        try:
+            text = rev.read_file("configure.in")
+        except:
+            return None
+
+    lines = text.split("\n")
+    for line in lines:
+        match = re.match(r"^AC_INIT\(\[(.+?)\], \[(.+?)\]", line)
+        if match:
+            return (match.group(1), match.group(2))
+    
+    # FIXME: the following code should be reenabled after we convert
+    # everything to automake
+    #
+    # raise dabuildsys.DebathenaBuildError("configure.{ac,in} contains no version file it is supposed to contain")
+    return None
+
+def get_version_by_python_distutils(rev):
+    """
+    Extract the package version number from setup.py.
+    """
+
+    try:
+        text = rev.read_file("setup.py")
+    except:
+        return None
+
+    root = rev.repo.root
+    rev.checkout()
+    cmd = ['python', 'setup.py', '--version']
+    return subprocess.check_output(cmd, cwd = root).strip()
+
+def build_automake_tarball(package, version, rev, filename, generated_path, dest_path):
+    """
+    Generate makefile and invoke automake in order to get
+    a redistributable tarball.
+    """
+
+    root = rev.repo.root
+    rev.checkout()
+    def run(*cmd):
+        args = {'stderr' : subprocess.STDOUT} if quiet else {}
+        return subprocess.check_output(cmd, cwd = root, **args)
+
+    run('autoreconf', '-fvi')
+    run('./configure')
+    run('make', 'distcheck')
+
+def do_git_archive(package, version, rev, filename, generated_path, dest_path):
+    """
+    Create a redistributable tarball from the specified Git revision.
+    """
+
+    fullname = "%s-%s" % (package, version)
+    rev.repo.git('archive', '--prefix=%s/' % fullname, '--output=%s' % filename, rev.hash)
+
+def build_upstream_tarball(package):
+    """
+    Build a correct redistributable release of non-Debian-specific package.
+    """
+
+    # Set up the repo object and view on the lastest upstream version
+    repo = dabuildsys.get_repo_for_package(package)
+    root = repo.root
+    latest = repo.read_branch_head("master")
+
+    # Try autoconf and distutils
+    autoconf_version = get_version_by_autoconf(latest)
+    distutils_version = get_version_by_python_distutils(latest)
+    if autoconf_version:
+        ac_name, version = autoconf_version
+
+        # The following check is important, because the name of upstream tarball
+        # as generated depends on the name specified in configure.ac
+        if package != ac_name:
+            print >>sys.stderr, "Autoconf package name does not match the package name"
+            sys.exit(1)
+
+        method = 'make distcheck'
+    elif distutils_version:
+        version = distutils_version
+        method = 'git archive'
+    else:
+        try:
+            version = latest.read_file("VERSION")
+        except:
+            print >>sys.stderr, "No VERSION file found, and no other way to determine current version was provided"
+            sys.exit(1)
+        method = 'git archive'
+
+    # The tag must exist in order for build to succeed
+    try:
+        tagged = repo.read_tag(version)
+    except:
+        print >>sys.stderr, "Unable to find the tag corresponding to version %s" % version
+        sys.exit(1)
+
+    print "Using `%s' to generate redistributable tarball for %s %s" % (method, package, version)
+    print "Used revision: %s" % tagged.hash
+
+    # Determine the relevant filenames and paths
+    filename = '%s-%s.tar.gz' % (package, version)
+    generated_path = os.path.join(root, filename)
+    dest_path = os.path.join(dabuildsys.orig_tarball_dir, filename)
+
+    # Do not overwrite existing files
+    if os.path.isfile(dest_path):
+        print >>sys.stderr, "File %s already exists, aborting" % dest_path
+        sys.exit(1)
+
+    if method == 'make distcheck':
+        build_automake_tarball(package, version, tagged, filename, generated_path, dest_path)
+    if method == 'git archive':
+        do_git_archive(package, version, tagged)
+
+    if not os.path.isfile(generated_path):
+        print >> sys.stderr, "Generation ran successfuly, but file %s was not found" % generated_path
+        sys.exit(1)
+    shutil.move(generated_path, dest_path)
+
+    print "Successfully created %s using `git archive'." % filename
+    print "Full location: %s" % dest_path
+
+def main():
+    argparser = argparse.ArgumentParser(description="Generate upstream tarballs")
+    argparser.add_argument("package", help="A package to generate tarball for")
+    argparser.add_argument("--quiet", "-q", action="store_true", help="Do not print autoconf output")
+    args = argparser.parse_args()
+
+    global quiet
+    quiet = args.quiet
+
+    build_upstream_tarball(args.package)
+
+if __name__ == '__main__':
+    main()
