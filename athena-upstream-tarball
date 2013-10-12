@@ -66,8 +66,8 @@ def build_automake_tarball(package, version, rev, filename, generated_path, dest
     root = rev.repo.root
     rev.checkout()
     def run(*cmd):
-        args = {'stderr' : subprocess.STDOUT} if quiet else {}
-        return subprocess.check_output(cmd, cwd = root, **args)
+        kwargs = {'stderr' : subprocess.STDOUT} if quiet else {}
+        return subprocess.check_output(cmd, cwd = root, **kwargs)
 
     run('autoreconf', '-fvi')
     run('./configure')
