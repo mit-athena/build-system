@@ -19,11 +19,16 @@ class GitRepository(object):
     def __init__(self, root):
         self.root = root
 
+    def cmd(self, *args, **kwargs):
+        """Invoke a shell command in the specified repository."""
+
+        cmd = list(args)
+        return subprocess.check_output(cmd, stderr = subprocess.STDOUT, cwd = self.root, **kwargs).strip()
+
     def git(self, *args, **kwargs):
         """Invoke git(1) for the specified repository."""
 
-        cmd = ['git'] + list(args)
-        return subprocess.check_output(cmd, stderr = subprocess.STDOUT, cwd = self.root, **kwargs).strip()
+        return self.cmd(*(('git',) + args), **kwargs)
 
     def get_refs(self):
         output = self.git('show-ref')
@@ -60,6 +65,15 @@ class GitRepository(object):
 
     def get_object_type(self, obj):
         return self.git('cat-file', '-t', obj).strip()
+
+    def import_tarball(self, tarfile, rev):
+        if isinstance(rev, GitCommit):
+            rev = rev.hash
+
+        self.cmd('pristine-tar', 'commit', tarfile, rev)
+
+    def export_tarball(self, tarfile):
+        self.cmd('pristine-tar', 'checkout', tarfile)
 
 class GitCommit(object):
     def __init__(self, repo, name):
