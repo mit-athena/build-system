@@ -87,7 +87,7 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
     """
 
     # Set up the repo object and view on the lastest upstream version
-    repo = dabuildsys.get_repo_for_package(package)
+    repo = dabuildsys.PackageCheckout(package)
     root = repo.root
     latest = repo.read_branch_head("master")
 
@@ -139,7 +139,7 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
         if method == 'make distcheck':
             build_automake_tarball(package, version, tagged, filename, generated_path, dest_path)
         if method == 'git archive':
-            do_git_archive(package, version, tagged)
+            do_git_archive(package, version, tagged, filename, generated_path, dest_path)
 
         if not os.path.isfile(generated_path):
             print >> sys.stderr, "Generation ran successfuly, but file %s was not found" % generated_path
