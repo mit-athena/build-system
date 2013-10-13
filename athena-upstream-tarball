@@ -2,7 +2,8 @@
 
 """
 Create an Athena redistribution platform for the specified package.
-Not Debian-specific.
+Not Debian-specific, but relies on Debathena build system for working
+with source checkouts.
 """
 
 import dabuildsys
