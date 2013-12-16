@@ -1,4 +1,4 @@
 #!/usr/bin/python
 
-class DebathenaBuildError(Exception):
+class BuildError(Exception):
     pass

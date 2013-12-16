@@ -40,7 +40,7 @@ def get_version_by_autoconf(rev):
     # FIXME: the following code should be reenabled after we convert
     # everything to automake
     #
-    # raise dabuildsys.DebathenaBuildError("configure.{ac,in} contains no version file it is supposed to contain")
+    # raise dabuildsys.BuildError("configure.{ac,in} contains no version file it is supposed to contain")
     return None
 
 def get_version_by_python_distutils(rev):

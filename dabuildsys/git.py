@@ -97,3 +97,11 @@ class GitCommit(object):
     def read_file(self, path):
         pathspec = "%s:%s" % (self.hash, path)
         return self.repo.git('cat-file', 'blob', pathspec)
+
+    def file_exists(self, path):
+        try:
+            self.read_file(path)
+        except subprocess.CalledProcessError:
+            return False
+
+        return True
