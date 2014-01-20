@@ -18,10 +18,11 @@ class PackageCheckout(git.GitRepository):
         super(PackageCheckout, self).__init__(config.package_map[package])
 
         if full_clean:
+            self.git('fetch', '--all')
             self.full_clean()
 
         self.determine_type()
-        self.parse_changelog()
+        self.load_changelog()
 
     def get_debian_file(self, filename):
         rev = git.GitCommit(self, 'master' if self.native else 'debian')
@@ -44,7 +45,7 @@ class PackageCheckout(git.GitRepository):
     def full_clean(self):
         self.clean()
         self.remote_checkout('master')
-        if not self.native:
+        if self.has_branch('debian'):
             self.remote_checkout('debian')
 
     def validate_common(self):
@@ -72,21 +73,28 @@ class PackageCheckout(git.GitRepository):
         if source_format != '3.0 (quilt)':
             raise BuildError('Package source format is not quilt')
 
-    def parse_changelog(self):
+    def load_changelog(self):
         log = debian.changelog.Changelog(self.get_debian_file('changelog'))
+        versions = self.parse_changelog(log)
+        if not versions:
+            raise BuildError("The package has no released versions")
 
-        self.changelog = log
-        self.version = log.full_version
+        self.released, self.version, self.upstream_version, self.released_version = versions
+        self.name = log.package
+
+    def parse_changelog(self, log):
+        """Parse the debian/changelog file. Returns None if package was never released
+        or (is_released, version, upstream_version, released_version) otherwise."""
+
+        version = log.full_version
+        upstream_version = log.upstream_version
         if log.distributions == 'unstable':
-            self.released = True
-            self.released_version = self.version
-        elif log.distrubitons == 'UNRELEASED':
-            self.released = False
+            return (True, version, upstream_version, version)
+        elif log.distributions == 'UNRELEASED':
             for change in log:
                 if change.distributions == 'unstable':
-                    self.released_version = str(change.version)
-                    break
+                    return (False, version, upstream_version, str(change.version))
             else:
-                raise BuildError("No version of package has been ever released")
+                return None
         else:
             raise BuildError("Invalid suite name: " + log.distributions)
