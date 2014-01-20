@@ -28,7 +28,8 @@ class GitRepository(object):
     def git(self, *args, **kwargs):
         """Invoke git(1) for the specified repository."""
 
-        return self.cmd(*(('git',) + args), **kwargs)
+        args_flattened = tuple(arg.hash if isinstance(arg, GitCommit) else arg for arg in args)
+        return self.cmd(*(('git',) + args_flattened), **kwargs)
 
     def get_refs(self):
         output = self.git('show-ref')
@@ -61,7 +62,20 @@ class GitRepository(object):
         self.git('checkout', '-B', branch, '%s/%s' % (self.remote, branch))
 
     def get_common_ancestor(self, rev1, rev2):
-        self.git('merge-base', rev1, rev2)
+        return GitCommit(self, self.git('merge-base', rev1, rev2))
+
+    def is_ancestor(self, rev_older, rev_newer):
+        """Checks if the rev_older is an ancestor of rev_newer. Returns true
+        in case if two revisions are equal."""
+
+        try:
+            self.git('merge-base', '--is-ancestor', rev_older, rev_newer)
+            return True
+        except subprocess.CalledProcessError as err:
+            if err.returncode == 1:
+                return False
+            else:
+                raise
 
     def get_object_type(self, obj):
         return self.git('cat-file', '-t', obj).strip()
@@ -105,3 +119,29 @@ class GitCommit(object):
             return False
 
         return True
+
+    def __eq__(self, rev2):
+        return self.hash == rev2.hash
+
+    def __le__(self, rev2):
+        return self.repo.is_ancestor(self.hash, rev2.hash)
+
+    def __ge__(self, rev2):
+        return self.repo.is_ancestor(rev2.hash, self.hash)
+
+    def __lt__(self, rev2):
+        return self <= rev2 and not self == rev2
+
+    def __gt__(self, rev2):
+        return self >= rev2 and not self == rev2
+
+    def __and__(self, rev2):
+        """Find common ancestor of two revisions."""
+
+        return self.repo.get_common_ancestor(self, rev2)
+
+    def __str__(self):
+        return self.hash
+
+    def __repr__(self):
+        return "<commit '%s' in repository '%s'>" % (self.hash, self.repo.root)
