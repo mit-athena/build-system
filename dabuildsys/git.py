@@ -45,7 +45,7 @@ class GitRepository(object):
         return local_ref in refs or (not local_only and remote_ref in refs)
 
     def get_rev(self, name):
-        return GitCommit(self, self.git('rev-parse', name))
+        return GitCommit(self, name)
 
     def read_branch_head(self, name):
         return self.get_rev('refs/heads/%s' % name)
