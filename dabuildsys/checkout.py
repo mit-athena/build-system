@@ -7,6 +7,7 @@ Class which represents the source checkout of a package.
 import config
 import debian.changelog
 import git
+import subprocess
 
 from common import BuildError
 
@@ -75,26 +76,75 @@ class PackageCheckout(git.GitRepository):
 
     def load_changelog(self):
         log = debian.changelog.Changelog(self.get_debian_file('changelog'))
-        versions = self.parse_changelog(log)
-        if not versions:
-            raise BuildError("The package has no released versions")
 
-        self.released, self.version, self.upstream_version, self.released_version = versions
         self.name = log.package
 
-    def parse_changelog(self, log):
-        """Parse the debian/changelog file. Returns None if package was never released
-        or (is_released, version, upstream_version, released_version) otherwise."""
+        self.version = log.full_version
+        self.upstream_version = log.upstream_version
 
-        version = log.full_version
-        upstream_version = log.upstream_version
         if log.distributions == 'unstable':
-            return (True, version, upstream_version, version)
+            self.released = True
+            self.released_version = self.version
         elif log.distributions == 'UNRELEASED':
             for change in log:
                 if change.distributions == 'unstable':
-                    return (False, version, upstream_version, str(change.version))
+                    self.released = False
+                    self.released_version = str(change.version)
+                    break
             else:
-                return None
+                raise BuildError("The package has no released versions")
         else:
             raise BuildError("Invalid suite name: " + log.distributions)
+
+    def get_build_revisions(self, upstream_version, version):
+        """Given the upstream and the Debian version, find the appropriate
+        Git revision for upstream and for Debian, check their relationship
+        and return them as (upstream, debian) revision tuple."""
+
+        cur = self.get_rev('debian')
+        prev = None
+        master = self.get_rev('master')
+        found = False
+        while True:
+            # Read the changelog of current revisions
+            try:
+                log = debian.changelog.Changelog(cur.read_file('debian/changelog'))
+            except subprocess.CalledProcessError:
+                if found:
+                    break
+                else:
+                    return None
+
+            # Check if the current revision is matching
+            if log.distributions == 'unstable' and str(log.full_version) == version and log.upstream_version == upstream_version:
+                    # Found the matching revision
+                    found = True
+
+            elif found:
+                # We found the point at which the release was made
+                break
+
+            # Move to next parent revision
+            prev = cur
+            parents = cur.parents
+            if len(parents) == 0:
+                # Not found
+                return None
+            elif len(parents) == 1:
+                cur = self.get_rev(parents[0])
+            else:
+                debian_parents = [rev for rev in map(self.get_rev, parents) if not rev < master]
+                if len(debian_parents) != 1:
+                    raise BuildError("Debian revision search breakdown at revision %s" % str(cur))
+                cur = self.get_rev(debian_parents[0])
+
+        # If we are here, it means that we are past the part of the history where
+        # the version matched our search conditions
+        deb_rev = prev
+        orig_rev = deb_rev & master
+        tagged_rev = self.read_tag(upstream_version)
+        if orig_rev != tagged_rev:
+            raise BuildError("Version tagged as release %s is not merge"
+                    "base of corresponding Debian package release" % upstream_version)
+
+        return orig_rev, deb_rev

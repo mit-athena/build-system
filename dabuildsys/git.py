@@ -48,10 +48,10 @@ class GitRepository(object):
         return GitCommit(self, name)
 
     def read_branch_head(self, name):
-        return self.get_rev('refs/heads/%s' % name)
+        return self.get_rev('refs/heads/%s^{}' % name)
 
     def read_tag(self, name):
-        return self.get_rev('refs/tags/%s' % name)
+        return self.get_rev('refs/tags/%s^{}' % name)
 
     def clean(self):
         self.git('clean', '-xfd')
@@ -122,6 +122,9 @@ class GitCommit(object):
 
     def __eq__(self, rev2):
         return self.hash == rev2.hash
+
+    def __ne__(self, rev2):
+        return self.hash != rev2.hash
 
     def __le__(self, rev2):
         return self.repo.is_ancestor(self.hash, rev2.hash)
