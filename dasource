@@ -1,0 +1,114 @@
+#!/usr/bin/python
+
+"""
+Generate the source Debian package from the source checkout using its name.
+"""
+
+# git buildpackage --git-no-ignore-new --git-upstream-tree=tag --git-upstream-tag=$$$$ -S
+# --git-debian-branch=debian --git-no-create-orig --git-export=b401e81eecdfe6fcf39bb1f421f0d2e77ce9c9e4
+
+# git tag -s 1.1.3-0debathena1 b401e81eecdfe6fcf39bb1f421f0d2e77ce9c9e4 -m "Release 1.1.3-0debathena1" -u 0D8A9E8F
+
+import dabuildsys
+
+import argparse
+import os.path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+from functools import partial
+
+def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=False):
+    """Builds a Debian source package given the checkout, the Debian version
+    and the upstream version."""
+
+    ucommit, dcommit = checkout.get_build_revisions(uver, dver)
+    print "Attempting to build source package for %s %s" % (checkout.name, dver)
+    print "Debian revision: %s" % str(dcommit)
+    print "Upstream revision: %s" % str(ucommit)
+
+    tmpdir = tempfile.mkdtemp('dabuildsys')
+    pkgname = "%s-%s" % (checkout.name, uver)
+    pkgdir = os.path.join(tmpdir, pkgname)
+    origfile = os.path.join(tmpdir, "%s_%s.orig.tar.gz" % (checkout.name, uver))
+
+    files = checkout.get_source_filenames(dver)
+    files_tmp = map(partial(os.path.join, tmpdir), files)
+    files_dst = map(partial(os.path.join, dabuildsys.source_package_dir), files)
+
+    if not allow_overwrite and any(os.path.exists(f) for f in files_dst):
+        print >>sys.stderr, "%s already has a built version in source packages directory" % pkgname
+        sys.exit(1)
+
+    if not checkout.native:
+        pristine_name = "%s.tar.gz" % re.sub('^debathena-', '', pkgname)
+        pristine_path = os.path.join(tmpdir, pristine_name)
+
+        orig_tree = checkout.get_tarball_tree(pristine_name)
+        if not orig_tree:
+            print >>sys.stderr, "Upstream tarball %s is not imported via pristine-tar" % pristine_name
+            os.rmdir(tmpdir)
+            sys.exit(1)
+        if orig_tree != ucommit.tree:
+            print >>sys.stderr, "Upstream tarball %s was not generated from upstream commit" % orig_tree
+            os.rmdir(tmpdir)
+            sys.exit(1)
+
+        checkout.export_tarball(pristine_path)
+        os.rename(pristine_path, origfile)
+    
+    print "Temporary direcrtory: %s" % tmpdir
+
+    os.mkdir(pkgdir)
+    dcommit.extract_tree(pkgdir)
+
+    try:
+        debuild_out = subprocess.check_output(['debuild', '-S', '-us', '-uc'],
+                stderr = subprocess.STDOUT,
+                cwd = pkgdir).strip()
+    except subprocess.CalledProcessError as err:
+        print >>sys.stderr, "===== BEGIN DEBUILD OUTPUT ====="
+        print >>sys.stderr, err.output
+        print >>sys.stderr, "===== END DEBUILD OUTPUT ====="
+        print >>sys.stderr, "debuild exited with return code %i" % err.returncode
+        sys.exit(1)
+
+    print
+    print "Successfully built the source package"
+
+    for src, dst in zip(files_tmp, files_dst):
+        shutil.move(src, dst)
+
+    print "The following files are now in %s:" % dabuildsys.source_package_dir
+    for filename in files:
+        print "* %s" % filename
+
+    if not keep_temp:
+        shutil.rmtree(tmpdir)
+
+def main():
+    argparser = argparse.ArgumentParser(description="Build a source package")
+    argparser.add_argument("packages", nargs='+', help="A package to generate tarball for")
+    argparser.add_argument("--unreleased", "-u", action="store_true", help="Build the last released version if the package is not released")
+    argparser.add_argument("--allow-overwrite", action="store_true", help="Overwrite package files if they already exist")
+    argparser.add_argument("--keep-temp", action="store_true", help="Keep the temporary directory")
+    args = argparser.parse_args()
+
+    for package in args.packages:
+        checkout = dabuildsys.PackageCheckout(package, full_clean=True)
+        if not checkout.released and not args.unreleased:
+            print >>sys.stderr, "Package %s is not released, and -u flag is not specified" % package
+            sys.exit(1)
+        
+        version = checkout.released_version
+        build_source_package(checkout,
+                version,
+                dabuildsys.extract_upstream_version(version),
+                allow_overwrite=args.allow_overwrite,
+                keep_temp=args.keep_temp)
+
+if __name__ == '__main__':
+    main()

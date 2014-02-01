@@ -9,7 +9,7 @@ import debian.changelog
 import git
 import subprocess
 
-from common import BuildError
+from common import BuildError, extract_upstream_version
 
 class PackageCheckout(git.GitRepository):
     def __init__(self, package, full_clean = False):
@@ -154,3 +154,19 @@ class PackageCheckout(git.GitRepository):
                     "base of corresponding Debian package release" % upstream_version)
 
         return orig_rev, deb_rev
+
+    def get_source_filenames(self, version=None, include_extra=False):
+        """Returns a list of all files included in the source package for this
+        package.  If version is not specified, current is used.  If include_extra
+        is True, .changes and .build files are included."""
+
+        if not version:
+            version = self.version
+
+        package_name = "%s_%s" % (self.name, version)
+        extras = ["%s_source.build", "%s_source.changes"] if include_extra else []
+        if self.native:
+            return [s % package_name for s in ["%s.dsc", "%s.tar.gz" ] + extras]
+        else:
+            orig = "%s_%s.orig.tar.gz" % (self.name, extract_upstream_version(version))
+            return [s % package_name for s in ["%s.dsc", "%s.debian.tar.gz"] + extras] + [orig]

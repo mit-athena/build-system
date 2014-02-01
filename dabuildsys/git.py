@@ -4,8 +4,10 @@
 Utility classes for working with Git.
 """
 
+import os
 import os.path
 import subprocess
+import tempfile
 
 def flip(t):
     a, b = t
@@ -89,6 +91,12 @@ class GitRepository(object):
     def export_tarball(self, tarfile):
         self.cmd('pristine-tar', 'checkout', tarfile)
 
+    def get_tarball_tree(self, tarfile):
+        try:
+            return self.git('cat-file', 'blob', "refs/heads/pristine-tar:%s.id" % tarfile)
+        except subprocess.CalledProcessError as err:
+            return None
+
 class GitCommit(object):
     def __init__(self, repo, name):
         self.repo = repo
@@ -119,6 +127,18 @@ class GitCommit(object):
             return False
 
         return True
+
+    def extract_tree(self, path):
+        indexfile = tempfile.mktemp()
+
+        env = os.environ.copy()
+        env['GIT_WORK_TREE'] = path
+        env['GIT_INDEX_FILE'] = indexfile
+
+        self.repo.git('read-tree', self.tree, env=env)
+        self.repo.git('checkout-index', '-a', env=env)
+
+        os.unlink(indexfile)
 
     def __eq__(self, rev2):
         return self.hash == rev2.hash
