@@ -101,9 +101,12 @@ class PackageCheckout(git.GitRepository):
         Git revision for upstream and for Debian, check their relationship
         and return them as (upstream, debian) revision tuple."""
 
-        cur = self.get_rev('debian')
+        if self.native:
+            cur = master = self.get_rev('master')
+        else:
+            cur = self.get_rev('debian')
+            master = self.get_rev('master')
         prev = None
-        master = self.get_rev('master')
         found = False
         while True:
             # Read the changelog of current revisions
@@ -141,6 +144,9 @@ class PackageCheckout(git.GitRepository):
         # If we are here, it means that we are past the part of the history where
         # the version matched our search conditions
         deb_rev = prev
+        if self.native:
+            return deb_rev, deb_rev
+
         orig_rev = deb_rev & master
         tagged_rev = self.read_tag(upstream_version)
         if orig_rev != tagged_rev:
