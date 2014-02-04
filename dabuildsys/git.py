@@ -20,6 +20,7 @@ class GitRepository(object):
 
     def __init__(self, root):
         self.root = root
+        self.rev_cache = {}
 
     def cmd(self, *args, **kwargs):
         """Invoke a shell command in the specified repository."""
@@ -47,7 +48,10 @@ class GitRepository(object):
         return local_ref in refs or (not local_only and remote_ref in refs)
 
     def get_rev(self, name):
-        return GitCommit(self, name)
+        if name not in self.rev_cache:
+            self.rev_cache[name] = GitCommit(self, name)
+
+        return self.rev_cache[name]
 
     def read_branch_head(self, name):
         return self.get_rev('refs/heads/%s^{}' % name)

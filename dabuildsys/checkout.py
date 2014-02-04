@@ -6,7 +6,9 @@ Class which represents the source checkout of a package.
 
 import config
 import debian.changelog
+import debian.deb822
 import git
+import os.path
 import subprocess
 
 from common import BuildError, extract_upstream_version
@@ -26,11 +28,11 @@ class PackageCheckout(git.GitRepository):
         self.load_changelog()
 
     def get_debian_file(self, filename):
-        rev = git.GitCommit(self, 'master' if self.native else 'debian')
+        rev = self.get_rev('master' if self.native else 'debian')
         return rev.read_file('debian/%s' % filename)
 
     def exists_debian_file(self, filename):
-        rev = git.GitCommit(self, 'master' if self.native else 'debian')
+        rev = self.get_rev('master' if self.native else 'debian')
         return rev.file_exists('debian/%s' % filename)
 
     def determine_type(self):
@@ -80,16 +82,19 @@ class PackageCheckout(git.GitRepository):
         self.name = log.package
 
         self.version = log.full_version
+        self.version_obj = log.version
         self.upstream_version = log.upstream_version
 
         if log.distributions == 'unstable':
             self.released = True
             self.released_version = self.version
+            self.released_version_obj = self.version_obj
         elif log.distributions == 'UNRELEASED':
             for change in log:
                 if change.distributions == 'unstable':
                     self.released = False
                     self.released_version = str(change.version)
+                    self.released_version_obj = change.version
                     break
             else:
                 raise BuildError("The package has no released versions")
@@ -170,3 +175,44 @@ class PackageCheckout(git.GitRepository):
         else:
             orig = "%s_%s.orig.tar.gz" % (self.name, extract_upstream_version(version))
             return [s % package_name for s in ["%s.dsc", "%s.debian.tar.gz"] + extras] + [orig]
+
+    def get_supported_releases(self):
+        """Returns the list of releases for which package is still built."""
+
+        # FIXME: this code should only parse the prologue of the file
+        # Unfortunately, the fields in question were to this day only
+        # specified for binary package, and extracted in a manner so
+        # that field for any binary package affected all of them
+        control = {}
+        for block in debian.deb822.Deb822.iter_paragraphs(self.get_debian_file('control').split("\n")):
+            control.update(block)
+
+        if 'X-Debathena-Build-For' in control:
+            return control['X-Debathena-Build-For'].split(' ')
+
+        releases = set(config.releases)
+        if 'X-Debathena-No-Build' in control:
+            releases -= set(control['X-Debathena-No-Build'].split(' '))
+
+        return list(releases)
+
+package_name_cache = {}
+
+def lookup_by_package_name(name):
+    global package_name_cache
+
+    if not package_name_cache:
+        for package_dirname, package_path in config.package_map.iteritems():
+            repo = git.GitRepository(package_path)
+            print package_dirname
+            try:
+                changelog_text = repo.git('cat-file', 'blob', 'refs/heads/debian:debian/changelog')
+            except:
+                try:
+                    changelog_text = repo.git('cat-file', 'blob', 'refs/heads/master:debian/changelog')
+                except:
+                    continue
+            package_name, _ = changelog_text.split(' ', 1)
+            package_name_cache[package_name] = package_dirname
+
+    return package_name_cache.get(name)

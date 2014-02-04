@@ -1,0 +1,52 @@
+#!/usr/bin/python
+
+import dabuildsys
+
+import argparse
+
+def show_results(results):
+    broken = []
+    missing = []
+    out_of_date = []
+
+    for result in results:
+        pkg, gitver, aptver = result
+        if aptver and gitver:
+            out_of_date.append(result)
+        elif gitver and not aptver:
+            missing.append(result)
+        else:
+            broken.append(result)
+
+    if out_of_date:
+        out_of_date.sort()
+        print "== Out-of-date packages =="
+        for pkg, gitver, aptver in out_of_date:
+            print "* %s %s (APT version: %s)" % (pkg, str(gitver), str(aptver))
+        print
+
+    if missing:
+        missing.sort()
+        print "== Packages missing in APT =="
+        for pkg, gitver, aptver in missing:
+            print "* %s %s" % (pkg, str(gitver))
+        print
+
+    if broken:
+        broken.sort()
+        print "== Packages broken in Git =="
+        for pkg, gitver, err in broken:
+            print "* %s (%s)" % (pkg, str(err))
+        print
+
+def main():
+    argparser = argparse.ArgumentParser(description="Compares the packages in Git and in APT")
+    argparser.add_argument('--update', '-u', action='store_true', help="Fetch new checkout data from remotes")
+    argparser.add_argument('release', choices=dabuildsys.releases, help="Release to compare against from APT")
+
+    args = argparser.parse_args()
+    _, _, apt_repo = dabuildsys.get_release(args.release)
+    show_results( dabuildsys.compare_against_git(apt_repo, args.update) )
+
+if __name__ == '__main__':
+    main()

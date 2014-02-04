@@ -9,7 +9,8 @@ import os
 import os.path
 
 debian_releases = ['squeeze', 'wheezy']
-ubuntu_releases = ['precise', 'quantal', 'raring']
+ubuntu_releases = ['precise', 'quantal', 'raring', 'saucy']
+releases = debian_releases + ubuntu_releases
 
 package_search_paths = ['athena/*', 'debathena/*', 'third/*']
 package_root = os.environ['DEBATHENA_CHECKOUT_HOME']
@@ -34,5 +35,6 @@ def arch_for_release(arch, release):
 
 source_package_dir = os.environ['DEBATHENA_SOURCE_DIR']
 orig_tarball_dir = os.environ['DEBATHENA_ORIG_DIR']
+apt_root_dir = '/mit/debathena/apt'
 
 release_tag_key = "0D8A9E8F"
