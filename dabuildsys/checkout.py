@@ -204,7 +204,6 @@ def lookup_by_package_name(name):
     if not package_name_cache:
         for package_dirname, package_path in config.package_map.iteritems():
             repo = git.GitRepository(package_path)
-            print package_dirname
             try:
                 changelog_text = repo.git('cat-file', 'blob', 'refs/heads/debian:debian/changelog')
             except:
