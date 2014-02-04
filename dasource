@@ -10,6 +10,7 @@ Generate the source Debian package from the source checkout using its name.
 # git tag -s 1.1.3-0debathena1 b401e81eecdfe6fcf39bb1f421f0d2e77ce9c9e4 -m "Release 1.1.3-0debathena1" -u 0D8A9E8F
 
 import dabuildsys
+from dabuildsys import BuildError
 
 import argparse
 import os.path
@@ -21,14 +22,14 @@ import tempfile
 
 from functools import partial
 
+class BuildErrorNotReally(BuildError):
+    pass
+
 def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=False):
     """Builds a Debian source package given the checkout, the Debian version
     and the upstream version."""
 
     ucommit, dcommit = checkout.get_build_revisions(uver, dver)
-    print "Attempting to build source package for %s %s" % (checkout.name, dver)
-    print "Debian revision: %s" % str(dcommit)
-    print "Upstream revision: %s" % str(ucommit)
 
     tmpdir = tempfile.mkdtemp('dabuildsys')
     pkgname = "%s-%s" % (checkout.name, uver)
@@ -40,8 +41,11 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
     files_dst = map(partial(os.path.join, dabuildsys.source_package_dir), files)
 
     if not allow_overwrite and any(os.path.exists(f) for f in files_dst):
-        print >>sys.stderr, "%s already has a built version in source packages directory" % pkgname
-        sys.exit(1)
+        raise BuildErrorNotReally("%s already has a built version in source packages directory" % pkgname)
+
+    print "Attempting to build source package for %s %s" % (checkout.name, dver)
+    print "Debian revision: %s" % str(dcommit)
+    print "Upstream revision: %s" % str(ucommit)
 
     if not checkout.native:
         pristine_name = "%s.tar.gz" % re.sub('^debathena-', '', pkgname)
@@ -49,13 +53,11 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
         orig_tree = checkout.get_tarball_tree(pristine_name)
         if not orig_tree:
-            print >>sys.stderr, "Upstream tarball %s is not imported via pristine-tar" % pristine_name
             os.rmdir(tmpdir)
-            sys.exit(1)
+            raise BuildError("Upstream tarball %s is not imported via pristine-tar" % pristine_name)
         if orig_tree != ucommit.tree:
-            print >>sys.stderr, "Upstream tarball %s was not generated from upstream commit" % orig_tree
             os.rmdir(tmpdir)
-            sys.exit(1)
+            raise BuildError("Upstream tarball %s was not generated from upstream commit" % orig_tree)
 
         checkout.export_tarball(pristine_path)
         os.rename(pristine_path, origfile)
@@ -97,18 +99,52 @@ def main():
     argparser.add_argument("--keep-temp", action="store_true", help="Keep the temporary directory")
     args = argparser.parse_args()
 
-    for package in args.packages:
-        checkout = dabuildsys.PackageCheckout(package, full_clean=True)
-        if not checkout.released and not args.unreleased:
-            print >>sys.stderr, "Package %s is not released, and -u flag is not specified" % package
-            sys.exit(1)
-        
-        version = checkout.released_version
-        build_source_package(checkout,
-                version,
-                dabuildsys.extract_upstream_version(version),
-                allow_overwrite=args.allow_overwrite,
-                keep_temp=args.keep_temp)
+    built = []
+    failed = []
+    skipped = []
+
+    if len(args.packages) == 1 and args.packages[0].startswith('all:'):
+        _, release = args.packages[0].split(':', 2)
+        _, _, apt_repo = dabuildsys.get_release(release)
+        comparison = dabuildsys.compare_against_git(apt_repo)
+        packages = [dabuildsys.lookup_by_package_name(pkg) for pkg, gitver, aptver in comparison if gitver]
+    else:
+        packages = args.packages
+
+    for package in packages:
+        try:
+            checkout = dabuildsys.PackageCheckout(package, full_clean=True)
+            if not checkout.released and not args.unreleased:
+                raise BuildError("Package %s is not released, and -u flag is not specified" % package)
+            
+            version = checkout.released_version
+            build_source_package(checkout,
+                    version,
+                    dabuildsys.extract_upstream_version(version),
+                    allow_overwrite=args.allow_overwrite,
+                    keep_temp=args.keep_temp)
+            built.append(package)
+        except Exception as err:
+            if isinstance(err, BuildErrorNotReally):
+                print "Skipped %s, because already built" % package
+                skipped.append(package)
+            else:
+                print >>sys.stderr, "Failed building %s: %s" % (package, err)
+                failed.append(package)
+
+    if built:
+        built.sort()
+        print "%i packages built successfully: %s" % (len(built), ', '.join(built))
+    else:
+        print "No packages built successfully"
+
+    if failed:
+        failed.sort()
+        print "%i packages failed to build: %s" % (len(failed), ', '.join(failed))
+
+    if skipped:
+        skipped.sort()
+        print "%i packages skipped: %s" % (len(skipped), ', '.join(skipped))
 
 if __name__ == '__main__':
     main()
