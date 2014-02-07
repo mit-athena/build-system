@@ -12,6 +12,9 @@ debian_releases = ['squeeze', 'wheezy']
 ubuntu_releases = ['precise', 'quantal', 'raring', 'saucy']
 releases = debian_releases + ubuntu_releases
 
+debian_tags = { 'squeeze' : '6.0', 'wheezy' : '7.0', 'jessie' : '8.0~0.1' }
+ubuntu_tags = { 'precise' : '12.04', 'quantal' : '12.10', 'raring' : '13.04', 'saucy' : '13.10' }
+
 package_search_paths = ['athena/*', 'debathena/*', 'third/*']
 package_root = os.environ['DEBATHENA_CHECKOUT_HOME']
 
