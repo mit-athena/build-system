@@ -7,6 +7,7 @@ with source checkouts.
 """
 
 import dabuildsys
+from dabuildsys import BuildError
 
 import argparse
 import os.path
@@ -101,8 +102,7 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
         # The following check is important, because the name of upstream tarball
         # as generated depends on the name specified in configure.ac
         if package != ac_name:
-            print >>sys.stderr, "Autoconf package name does not match the package name"
-            sys.exit(1)
+            raise BuildError("Autoconf package name does not match the package name")
 
         method = 'make distcheck'
     elif distutils_version:
@@ -112,16 +112,14 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
         try:
             version = latest.read_file("VERSION")
         except:
-            print >>sys.stderr, "No VERSION file found, and no other way to determine current version was provided"
-            sys.exit(1)
+            raise BuildError("No VERSION file found, and no other way to determine current version was provided")
         method = 'git archive'
 
     # The tag must exist in order for build to succeed
     try:
         tagged = repo.read_tag(version)
     except:
-        print >>sys.stderr, "Unable to find the tag corresponding to version %s" % version
-        sys.exit(1)
+        raise BuildError("Unable to find the tag corresponding to version %s" % version)
 
     # Determine the relevant filenames and paths
     filename = '%s-%s.tar.gz' % (package, version)
@@ -134,8 +132,7 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
 
         # Do not overwrite existing files
         if os.path.isfile(dest_path):
-            print >>sys.stderr, "File %s already exists, aborting" % dest_path
-            sys.exit(1)
+            raise BuildError("File %s already exists, aborting" % dest_path)
 
         if method == 'make distcheck':
             build_automake_tarball(package, version, tagged, filename, generated_path, dest_path)
@@ -143,8 +140,7 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
             do_git_archive(package, version, tagged, filename, generated_path, dest_path)
 
         if not os.path.isfile(generated_path):
-            print >> sys.stderr, "Generation ran successfuly, but file %s was not found" % generated_path
-            sys.exit(1)
+            raise BuildError("Generation ran successfuly, but file %s was not found" % generated_path)
         shutil.move(generated_path, dest_path)
 
         print "Successfully created %s using `git archive'." % filename
@@ -171,4 +167,10 @@ def main():
     build_upstream_tarball(args.package, do_build, do_pristine_tar)
 
 if __name__ == '__main__':
-    main()
+    if not dabuildsys.claim_lock():
+        print >>sys.stderr, "The lock is in place; unable to proceed"
+        sys.exit(1)
+    try:
+        main()
+    finally:
+        dabuildsys.release_lock()
