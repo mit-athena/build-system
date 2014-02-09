@@ -31,17 +31,17 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
     ucommit, dcommit = checkout.get_build_revisions(uver, dver)
 
-    tmpdir = tempfile.mkdtemp('dabuildsys')
-    pkgname = "%s-%s" % (checkout.name, uver)
-    pkgdir = os.path.join(tmpdir, pkgname)
-    origfile = os.path.join(tmpdir, "%s_%s.orig.tar.gz" % (checkout.name, uver))
-
     files = checkout.get_source_filenames(dver)
-    files_tmp = map(partial(os.path.join, tmpdir), files)
     files_dst = map(partial(os.path.join, dabuildsys.source_package_dir), files)
 
     if not allow_overwrite and any(os.path.exists(f) for f in files_dst):
         raise BuildErrorNotReally("%s already has a built version in source packages directory" % pkgname)
+
+    tmpdir = tempfile.mkdtemp('dabuildsys')
+    files_tmp = map(partial(os.path.join, tmpdir), files)
+    pkgname = "%s-%s" % (checkout.name, uver)
+    pkgdir = os.path.join(tmpdir, pkgname)
+    origfile = os.path.join(tmpdir, "%s_%s.orig.tar.gz" % (checkout.name, uver))
 
     print "Attempting to build source package for %s %s" % (checkout.name, dver)
     print "Debian revision: %s" % str(dcommit)
