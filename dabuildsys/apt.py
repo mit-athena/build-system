@@ -18,6 +18,7 @@ from checkout import PackageCheckout
 from common import BuildError
 
 from debian.debian_support import Version
+from collections import defaultdict
 import debian.deb822
 import glob
 import os.path
@@ -84,13 +85,11 @@ class APTDistribution(object):
                     self.sources[pkg.name] = pkg
 
     def load_binaries(self):
-        self.binaries = {}
+        self.binaries = defaultdict(dict)
         for packages_file_path in glob.glob(os.path.join(self.path, '*', 'binary-*', 'Packages')):
             with open(packages_file_path, 'r') as packages_file:
                 for binary_pkg in debian.deb822.Packages.iter_paragraphs(packages_file):
                     pkg = APTBinaryPackage(binary_pkg['Package'], binary_pkg['Version'], binary_pkg['Architecture'])
-                    if pkg.name not in self.binaries:
-                        self.binaries[pkg.name] = {}
                     self.binaries[pkg.name][pkg.architecture] = pkg
 
     def merge(self, other):
