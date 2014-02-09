@@ -75,8 +75,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
         print >>sys.stderr, "===== BEGIN DEBUILD OUTPUT ====="
         print >>sys.stderr, err.output
         print >>sys.stderr, "===== END DEBUILD OUTPUT ====="
-        print >>sys.stderr, "debuild exited with return code %i" % err.returncode
-        sys.exit(1)
+        raise BuildError("debuild exited with return code %i" % err.returncode)
 
     print
     print "Successfully built the source package"
@@ -147,4 +146,10 @@ def main():
         print "%i packages skipped: %s" % (len(skipped), ', '.join(skipped))
 
 if __name__ == '__main__':
-    main()
+    if not dabuildsys.claim_lock():
+        print >>sys.stderr, "The lock is in place; unable to proceed"
+        sys.exit(1)
+    try:
+        main()
+    finally:
+        dabuildsys.release_lock()

@@ -38,6 +38,7 @@ def arch_for_release(arch, release):
 
 source_package_dir = os.environ['DEBATHENA_SOURCE_DIR']
 orig_tarball_dir = os.environ['DEBATHENA_ORIG_DIR']
-apt_root_dir = '/mit/debathena/apt'
+apt_root_dir = os.environ['DEBATHENA_APT_DIR']
+lock_file_path = os.environ['DEBATHENA_LOCK_FILE']
 
 release_tag_key = "0D8A9E8F"
