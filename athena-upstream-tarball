@@ -88,7 +88,7 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
     """
 
     # Set up the repo object and view on the lastest upstream version
-    repo = dabuildsys.PackageCheckout(package)
+    repo = dabuildsys.PackageCheckout(package, full_clean=True)
     root = repo.root
     latest = repo.read_branch_head("master")
 
