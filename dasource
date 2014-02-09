@@ -62,7 +62,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
         checkout.export_tarball(pristine_path)
         os.rename(pristine_path, origfile)
     
-    print "Temporary direcrtory: %s" % tmpdir
+    print "Temporary directory: %s" % tmpdir
 
     os.mkdir(pkgdir)
     dcommit.extract_tree(pkgdir)
