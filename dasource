@@ -33,13 +33,13 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
     files = checkout.get_source_filenames(dver)
     files_dst = map(partial(os.path.join, dabuildsys.source_package_dir), files)
+    pkgname = "%s-%s" % (checkout.name, uver)
 
     if not allow_overwrite and any(os.path.exists(f) for f in files_dst):
         raise BuildErrorNotReally("%s already has a built version in source packages directory" % pkgname)
 
     tmpdir = tempfile.mkdtemp('dabuildsys')
     files_tmp = map(partial(os.path.join, tmpdir), files)
-    pkgname = "%s-%s" % (checkout.name, uver)
     pkgdir = os.path.join(tmpdir, pkgname)
     origfile = os.path.join(tmpdir, "%s_%s.orig.tar.gz" % (checkout.name, uver))
 
@@ -49,6 +49,11 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
     if not checkout.native:
         pristine_name = "%s.tar.gz" % re.sub('^debathena-', '', pkgname)
+        tar_candidates = [s for s in checkout.list_tarballs() if s.lower() == pristine_name.lower()]
+        if len(tar_candidates) == 1:
+            pristine_name, = tar_candidates
+        else:
+            raise BuildError("Unable to find the tarball %s using pristine-tar" % pristine_name)
         pristine_path = os.path.join(tmpdir, pristine_name)
 
         orig_tree = checkout.get_tarball_tree(pristine_name)
@@ -102,17 +107,11 @@ def main():
     failed = []
     skipped = []
 
-    if len(args.packages) == 1 and args.packages[0].startswith('all:'):
-        _, release = args.packages[0].split(':', 2)
-        _, _, apt_repo = dabuildsys.get_release(release)
-        comparison = dabuildsys.compare_against_git(apt_repo)
-        packages = [dabuildsys.lookup_by_package_name(pkg) for pkg, gitver, aptver in comparison if gitver]
-    else:
-        packages = args.packages
+    checkouts = dabuildsys.expand_srcname_spec(args.packages)
 
-    for package in packages:
+    for checkout in checkouts:
+        package = checkout.dirname
         try:
-            checkout = dabuildsys.PackageCheckout(package, full_clean=True)
             if not checkout.released and not args.unreleased:
                 raise BuildError("Package %s is not released, and -u flag is not specified" % package)
             

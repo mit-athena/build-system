@@ -95,6 +95,9 @@ class GitRepository(object):
     def export_tarball(self, tarfile):
         self.cmd('pristine-tar', 'checkout', tarfile)
 
+    def list_tarballs(self):
+        return [s.strip() for s in self.cmd('pristine-tar', 'list').split("\n") if s.strip()]
+
     def get_tarball_tree(self, tarfile):
         try:
             return self.git('cat-file', 'blob', "refs/heads/pristine-tar:%s.id" % tarfile)
