@@ -107,7 +107,7 @@ def main():
     failed = []
     skipped = []
 
-    checkouts = dabuildsys.expand_srcname_spec(args.packages)
+    checkouts, _ = dabuildsys.expand_srcname_spec(args.packages)
 
     for checkout in checkouts:
         package = checkout.dirname

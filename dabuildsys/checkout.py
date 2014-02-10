@@ -19,6 +19,7 @@ class PackageCheckout(git.GitRepository):
             raise BuildError("Cannot find package %s" % package)
 
         super(PackageCheckout, self).__init__(config.package_map[package])
+        self.dirname = package
 
         if full_clean:
             self.git('fetch', '--all')

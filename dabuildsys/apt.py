@@ -123,7 +123,7 @@ def get_release(distribution):
     development.merge(proposed)
     return (production, proposed, development)
 
-def compare_against_git(apt_repo, update_all=False):
+def compare_against_git(apt_repo, update_all=False, checkout_cache=None):
     """Compare particular APT repo against the state of repositories in Git.
     If update_all is set to true, the repositories are fetched and reset to
     remote state.
@@ -133,11 +133,22 @@ def compare_against_git(apt_repo, update_all=False):
     if the checkout is invalid"""
 
     result = []
+    use_cache = isinstance(checkout_cache, dict)
     for package in config.package_map:
+        # Retrieve the checkout, possibly from cache, skip if invalid
         try:
-            checkout = PackageCheckout(package, full_clean=update_all)
+            try:
+                checkout = checkout_cache[package]
+                if not checkout:
+                    continue
+            except:
+                checkout = PackageCheckout(package, full_clean=update_all)
+                if use_cache:
+                    checkout_cache[package] = checkout
         except BuildError as err:
             result.append( (package, None, err) )
+            if use_cache:
+                checkout_cache[package] = None
             continue
 
         if apt_repo.release not in checkout.get_supported_releases():
