@@ -49,7 +49,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
     if not checkout.native:
         pristine_name = "%s.tar.gz" % re.sub('^debathena-', '', pkgname)
-        tar_candidates = [s for s in checkout.list_tarballs() if s.lower() == pristine_name.lower()]
+        tar_candidates = [s for s in checkout.list_tarballs() if s.lower().replace('_', '-') == pristine_name.lower()]
         if len(tar_candidates) == 1:
             pristine_name, = tar_candidates
         else:
