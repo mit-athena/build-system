@@ -16,7 +16,15 @@ def expand_srcname_spec(spec):
     APT repository is made and packages which have older version in APT than in Git
     are returned."""
 
-    if len(spec) > 1 or not spec[0].startswith('all'):
+    if len(spec) == 1 and spec[0] == '*':
+        checkouts = []
+        for pkg in config.package_map:
+            try:
+                checkouts.append(checkout.PackageCheckout(pkg))
+            except Exception as e:
+                pass
+        return checkouts, {}
+    elif len(spec) > 1 or not spec[0].startswith('all'):
         return [checkout.PackageCheckout(pkg) for pkg in spec], {}
     else:
         if spec[0] == 'all':
