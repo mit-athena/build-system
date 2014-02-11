@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import dabuildsys
+from dabuildsys import reprepro
 
 import argparse
 
@@ -22,7 +23,10 @@ def show_results(results):
         out_of_date.sort()
         print "== Out-of-date packages =="
         for pkg, gitver, aptver in out_of_date:
-            print "* %s %s (APT version: %s)" % (pkg, str(gitver), str(aptver))
+            if reprepro.find_source_version(pkg, gitver):
+                print "* %s %s (APT version: %s) [possibly repo version skew]" % (pkg, str(gitver), str(aptver))
+            else:
+                print "* %s %s (APT version: %s)" % (pkg, str(gitver), str(aptver))
         print
 
     if missing:

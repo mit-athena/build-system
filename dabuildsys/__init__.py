@@ -4,3 +4,5 @@ from common import *
 from config import *
 from git import *
 from srcname import *
+
+import reprepro
