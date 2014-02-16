@@ -83,7 +83,7 @@ def do_git_archive(package, version, rev, filename, generated_path, dest_path):
     fullname = "%s-%s" % (package, version)
     rev.repo.git('archive', '--prefix=%s/' % fullname, '--output=%s' % filename, rev.hash)
 
-def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
+def build_upstream_tarball(package, do_build = True, do_pristine_tar = False, allow_override = False):
     """
     Build a correct redistributable release of non-Debian-specific package.
     """
@@ -126,6 +126,10 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False):
     generated_path = os.path.join(root, filename)
     dest_path = os.path.join(dabuildsys.orig_tarball_dir, filename)
 
+    # Check if tarball is already checked-in
+    if not allow_override and filename.lower() in [s.lower() for s in repo.list_tarballs()]:
+        raise BuildError("Tarball %s is already checked-in" % filename)
+
     if do_build:
         print "Using `%s' to generate redistributable tarball for %s %s" % (method, package, version)
         print "Used revision: %s" % tagged.hash
@@ -156,6 +160,7 @@ def main():
     argparser.add_argument("--quiet", "-q", action="store_true", help="Do not print autoconf output")
     argparser.add_argument("--pristine-tar", "-p", action="store_true", help="Commit the tarball to the Git repo")
     argparser.add_argument("--only-pristine-tar", "-P", action="store_true", help="Do not build the tarball, only commit it")
+    argparser.add_argument("--yes-please-do-override-my-pristine-tar", action="store_true", help="Do not quit if pristine-tar is checked in")
     args = argparser.parse_args()
 
     global quiet
@@ -164,7 +169,7 @@ def main():
     do_build = not args.only_pristine_tar
     do_pristine_tar = args.pristine_tar or args.only_pristine_tar
 
-    build_upstream_tarball(args.package, do_build, do_pristine_tar)
+    build_upstream_tarball(args.package, do_build, do_pristine_tar, args.yes_please_do_override_my_pristine_tar)
 
 if __name__ == '__main__':
     if not dabuildsys.claim_lock():
