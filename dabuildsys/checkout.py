@@ -161,7 +161,7 @@ class PackageCheckout(git.GitRepository):
 
         return orig_rev, deb_rev
 
-    def get_source_filenames(self, version=None, include_extra=False):
+    def get_source_filenames(self, version=None, include_extra=False, include_manifest=False):
         """Returns a list of all files included in the source package for this
         package.  If version is not specified, current is used.  If include_extra
         is True, .changes and .build files are included."""
@@ -170,7 +170,11 @@ class PackageCheckout(git.GitRepository):
             version = self.version
 
         package_name = "%s_%s" % (self.name, version)
-        extras = ["%s_source.build", "%s_source.changes"] if include_extra else []
+        extras = []
+        if include_extra:
+            extras += ["%s_source.build", "%s_source.changes"]
+        if include_manifest:
+            extras += ["%s.debathena"]
         if self.native:
             return [s % package_name for s in ["%s.dsc", "%s.tar.gz" ] + extras]
         else:

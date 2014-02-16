@@ -13,6 +13,7 @@ import dabuildsys
 from dabuildsys import BuildError
 
 import argparse
+import debian.deb822
 import os.path
 import re
 import shutil
@@ -31,7 +32,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
     ucommit, dcommit = checkout.get_build_revisions(uver, dver)
 
-    files = checkout.get_source_filenames(dver)
+    files = checkout.get_source_filenames(dver, include_extra=True, include_manifest=True)
     files_dst = map(partial(os.path.join, dabuildsys.source_package_dir), files)
     pkgname = "%s-%s" % (checkout.name, uver)
 
@@ -42,6 +43,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
     files_tmp = map(partial(os.path.join, tmpdir), files)
     pkgdir = os.path.join(tmpdir, pkgname)
     origfile = os.path.join(tmpdir, "%s_%s.orig.tar.gz" % (checkout.name, uver))
+    manifestfile = os.path.join(tmpdir, "%s_%s.debathena" % (checkout.name, dver))
 
     print "Attempting to build source package for %s %s" % (checkout.name, dver)
     print "Debian revision: %s" % str(dcommit)
@@ -84,6 +86,15 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
     print
     print "Successfully built the source package"
+
+    # Record the manifest
+    with open(manifestfile, "w") as f:
+        manifest = debian.deb822.Deb822()
+        manifest['Upstream-Version'] = uver
+        manifest['Upstream-Commit']  = str(ucommit)
+        manifest['Debian-Version']   = dver
+        manifest['Debian-Commit']    = str(dcommit)
+        f.write(str(manifest))
 
     for src, dst in zip(files_tmp, files_dst):
         shutil.move(src, dst)
