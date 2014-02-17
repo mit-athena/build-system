@@ -8,7 +8,7 @@ from glob import glob
 import os
 import os.path
 
-debian_releases = ['squeeze', 'wheezy']
+debian_releases = ['squeeze', 'wheezy', 'jessie']
 ubuntu_releases = ['precise', 'quantal', 'raring', 'saucy']
 releases = debian_releases + ubuntu_releases
 
