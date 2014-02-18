@@ -147,7 +147,7 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False, al
             raise BuildError("Generation ran successfuly, but file %s was not found" % generated_path)
         shutil.move(generated_path, dest_path)
 
-        print "Successfully created %s using `git archive'." % filename
+        print "Successfully created %s using `%s'." % (filename, method)
         print "Full location: %s" % dest_path
 
     if do_pristine_tar:
