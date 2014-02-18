@@ -1,0 +1,118 @@
+#!/usr/bin/python
+
+"""
+Release a source package. This puts it into reprepro and, if operation succeeds,
+tag the debian revision and push it together with pristine-tar.
+"""
+
+import dabuildsys
+from dabuildsys import reprepro, BuildError
+
+import argparse
+import debian.deb822
+import os
+import sys
+
+def publish_package(pkg):
+    """Releases a source package."""
+
+    # Plan:
+    # 1. Do all the checks
+    # 2. Reprepro
+    # 3. Push tag and pristine-tar
+
+    # Part 0: get variables
+    local_refs  = pkg.get_refs(remote=False)
+    remote_refs = pkg.get_refs(remote=True)
+    dver, uver = pkg.released_version, pkg.released_version_obj.upstream_version
+    print "Attempting to export %s %s..." % (pkg.name, dver)
+    path_base = os.path.join(dabuildsys.source_package_dir, "%s_%s" % (pkg.name, dver))
+    with open(path_base + '.debathena', 'r') as f:
+        manifest = debian.deb822.Deb822(f)
+
+    # Part 1: do the checks
+
+    # Check versions
+    if uver != manifest['Upstream-Version']:
+        raise BuildError("The upstream version in file does not match one in the manifest")
+    if dver != manifest['Debian-Version']:
+        raise BuildError("The Debian version in file does not match one in the manifest")
+
+    # Check upstream tag 
+    if not pkg.native:
+        if manifest['Upstream-Commit'] != str(pkg.read_tag(uver)):
+            raise BuildError("The tag for version %s does not match the one in the source package manifest" % uver)
+
+    # Check that we can place Debian tags
+    tag_ref = 'refs/tags/' + dver
+    if tag_ref in local_refs:
+        raise BuildError("Tag %s already exists in local repository" % dver)
+    if tag_ref in remote_refs:
+        raise BuildError("Tag %s already exists in remote repository" % dver)
+
+    # Check pristine-tar branch
+    if not pkg.native and 'refs/heads/pristine-tar' in remote_refs:
+        local_pristine_tar  = pkg.get_rev(local_refs ['refs/heads/pristine-tar'])
+        remote_pristine_tar = pkg.get_rev(remote_refs['refs/heads/pristine-tar'])
+        if not (remote_pristine_tar < local_pristine_tar):
+            raise BuildError("Local pristine-tar branch is not ahead the remote one")
+
+    # Check reprepro
+    existing = reprepro.find_source_version(pkg.name, dver)
+    if existing:
+        raise BuildError("Package version already exists in release %s" % existing)
+
+    # Part 2: export to the APT repository
+    releases = [r + '-development' for r in pkg.get_supported_releases()]
+    print "Pushing package %s %s into following suites: %s" % (pkg.name, dver, ', '.join(releases))
+
+    # Do the exporting
+    for release in releases:
+        reprepro.include_package(release, pkg, dver)
+        print "* Pushed to %s" % release
+
+    # Part 3: do the tagging
+    debian_commit = pkg.get_rev(manifest['Debian-Commit'])
+    debian_commit.annotated_tag(dver, "Releasing " + dver, dabuildsys.release_tag_key)
+    print "Tagged %s as %s" % (str(debian_commit), dver)
+
+    if pkg.native:
+        pkg.push('refs/tags/' + dver)
+        print "Pushed tag onto remote"
+    else:
+        pkg.push('refs/tags/' + dver)
+        pkg.push('refs/heads/pristine-tar')
+        print "Pushed tag and pristine-tar onto remote"
+
+def main():
+    argparser = argparse.ArgumentParser(description="Publishes the source package into APT and Git")
+    argparser.add_argument("packages", nargs='+', help="A package to generate tarball for")
+    args = argparser.parse_args()
+
+    published = []
+    failed = []
+
+    checkouts, _ = dabuildsys.expand_srcname_spec(args.packages)
+
+    for checkout in checkouts:
+        try:
+            publish_package(checkout)
+            published.append(checkout.name)
+        except Exception as err:
+            failed.append(checkout.name)
+            print >>sys.stderr, "Failed to build package %s: %s" % (checkout.name, err)
+        print
+
+    if published:
+        print "%i packages published: %s" % (len(published), ", ".join(published))
+    if failed:
+        print "%i packages failed: %s" % (len(failed), ", ".join(failed))
+
+if __name__ == '__main__':
+    if not dabuildsys.claim_lock():
+        print >>sys.stderr, "The lock is in place; unable to proceed"
+        sys.exit(1)
+    try:
+        main()
+    finally:
+        dabuildsys.release_lock()

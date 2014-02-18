@@ -4,6 +4,7 @@
 Utility classes for working with Git.
 """
 
+import re
 import os
 import os.path
 import subprocess
@@ -34,11 +35,11 @@ class GitRepository(object):
         args_flattened = tuple(arg.hash if isinstance(arg, GitCommit) else arg for arg in args)
         return self.cmd(*(('git',) + args_flattened), **kwargs)
 
-    def get_refs(self):
-        output = self.git('show-ref')
-        lines = output.split("\n")
+    def get_refs(self, remote=False):
+        output = self.git('ls-remote', self.remote) if remote else self.git('show-ref')
+        lines = output.splitlines()
         lines = map(str.strip, lines)
-        return dict(flip(line.split(" ", 2)) for line in lines if line)
+        return dict(flip(re.split(r"\s+", line, 2)) for line in lines if line)
 
     def has_branch(self, name, local_only = False):
         local_ref = 'refs/heads/%s' % name
@@ -104,6 +105,9 @@ class GitRepository(object):
         except subprocess.CalledProcessError as err:
             return None
 
+    def push(self, ref):
+        self.git('push', self.remote, ref)
+
 class GitCommit(object):
     def __init__(self, repo, name):
         self.repo = repo
@@ -146,6 +150,12 @@ class GitCommit(object):
         self.repo.git('checkout-index', '-a', env=env)
 
         os.unlink(indexfile)
+
+    def annotated_tag(self, name, message, key=None):
+        if key:
+            self.repo.git('tag', '-s', name, self.hash, '-m', message, '-u', key)
+        else:
+            self.repo.git('tag', '-a', name, self.hash, '-m', message)
 
     def __eq__(self, rev2):
         return self.hash == rev2.hash

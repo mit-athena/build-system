@@ -10,6 +10,7 @@ from common import BuildError
 from debian.debian_support import Version
 from collections import defaultdict
 import operator
+import os
 import re
 import subprocess
 
@@ -51,3 +52,9 @@ def find_source_version(package, version):
         return distro
     except ValueError:
         return None
+
+def include_package(distro, pkg, dver):
+    """Include a package and version."""
+
+    changes = "%s_%s_source.changes" % (pkg.name, dver)
+    call('include', distro, os.path.join(config.source_package_dir, changes))
