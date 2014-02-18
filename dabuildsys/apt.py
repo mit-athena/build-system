@@ -90,6 +90,8 @@ class APTDistribution(object):
             with open(packages_file_path, 'r') as packages_file:
                 for binary_pkg in debian.deb822.Packages.iter_paragraphs(packages_file):
                     pkg = APTBinaryPackage(binary_pkg['Package'], binary_pkg['Version'], binary_pkg['Architecture'])
+                    path = os.path.join(config.apt_root_dir, binary_pkg['Filename'])
+                    pkg.file = APTFile(os.path.basename(path), path, binary_pkg['SHA256'])
                     self.binaries[pkg.name][pkg.architecture] = pkg
 
     def merge(self, other):
