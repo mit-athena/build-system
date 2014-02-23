@@ -4,6 +4,7 @@ import dabuildsys
 from dabuildsys import reprepro
 
 import argparse
+import sys
 
 def show_results(results):
     broken = []
