@@ -108,7 +108,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
 
 def main():
     argparser = argparse.ArgumentParser(description="Build a source package")
-    argparser.add_argument("packages", nargs='+', help="A package to generate source package for")
+    argparser.add_argument("packages", nargs='+', help="List of packages to build")
     argparser.add_argument("--unreleased", "-u", action="store_true", help="Build the last released version if the package is not released")
     argparser.add_argument("--allow-overwrite", action="store_true", help="Overwrite package files if they already exist")
     argparser.add_argument("--keep-temp", action="store_true", help="Keep the temporary directory")

@@ -86,7 +86,7 @@ def publish_package(pkg):
 
 def main():
     argparser = argparse.ArgumentParser(description="Publishes the source package into APT and Git")
-    argparser.add_argument("packages", nargs='+', help="A package to generate tarball for")
+    argparser.add_argument("packages", nargs='+', help="List of packages to publish")
     args = argparser.parse_args()
 
     published = []
