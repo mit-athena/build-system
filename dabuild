@@ -1,0 +1,133 @@
+#!/usr/bin/python
+
+import dabuildsys
+from dabuildsys import reprepro, BuildError
+
+from collections import defaultdict
+from functools import partial
+from pprint import pprint as pp
+import argparse
+import sys
+
+def build_package(release, pkg, arch):
+    print "~BUILD %s %s" % (pkg.name, arch)
+
+def union(s):
+    return reduce(lambda x, y: x | y, s, frozenset())
+
+def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
+    """Given a list of source packages, map of source packages to
+    binary packages they provide, map of build dependencies and map
+    of dependencies of binaries, resolve the order in which the source
+    packages need to be built.  Dependencies name are of string -> set()
+    format."""
+
+    # FIXME: this should cache
+    def resolve_dependencies_recursively(package, stack):
+        if package in stack:
+            raise BuildError("Dependency loop detected with package %s" % package)
+        return union(resolve_dependencies_recursively(pkg, stack | {package}) for pkg in bin_deps[package])
+
+    all_binaries = union(binary_map.values())
+
+    bin_deps_rec_cache = {}
+    def get_bin_deps(pkg):
+        if pkg not in bin_deps_rec_cache:
+            bin_deps_rec_cache[pkg] = resolve_dependencies_recursively(pkg, frozenset())
+        return bin_deps_rec_cache[pkg]
+
+    build_deps_rec = { srcpkg : union(get_bin_deps(binpkg) for binpkg in build_deps[srcpkg]) for srcpkg in build_deps }
+    bin_inverse = dict()
+    for srcpkg, binpkgs in binary_map.iteritems():
+        for binpkg in binpkgs:
+            bin_inverse[binpkg] = srcpkg
+
+    binary_space = binary_map.values()
+    order = []
+    working_set = [(source, frozenset(bin_inverse[binpkg] for binpkg in build_deps[source])) for source in sources]
+    working_set.sort(key=lambda (a,b): (len(b),a))
+
+    prev = -1
+    while working_set:
+        if len(working_set) == prev:
+            raise BuildError("Unable to resolve build dependencies")
+        prev = len(working_set)
+
+        for pkg, deps in working_set[:]:
+            if all(dep in order for dep in deps):
+                order.append(pkg)
+                working_set.remove( (pkg, deps) )
+            else:
+                print pkg, deps
+
+    return order
+
+def resolve_build_order(distro, build_targets, arches, bindep_distro=None):
+    """Given the distribution and a list of build targets in it,
+    attempts to construct a list of tuples of format
+    (source_name, architecture) """
+
+    sources = frozenset(union({target for target in build_targets[arch]} for arch in arches))
+    binary_map = { srcpkg : frozenset(distro.sources[srcpkg].binaries) for srcpkg in distro.sources }
+    all_binaries = union(binary_map.values())
+    def simplify_deps(deps):
+        # Returns set of dependencies, where each dependency
+        names = union({d["name"] for d in dep} for dep in deps)
+        return names & all_binaries
+
+    build_deps = { srcpkg : simplify_deps(distro.sources[srcpkg].relations['build-depends']) for srcpkg in distro.sources }
+    bin_deps   = { binpkg : union(simplify_deps(distro.binaries[binpkg][arch].relations['depends']) for arch in distro.binaries[binpkg]) for binpkg in distro.binaries }
+    if bindep_distro:
+        extra = { binpkg : union(simplify_deps(bindep_distro.binaries[binpkg][arch].relations['depends']) for arch in bindep_distro.binaries[binpkg]) for binpkg in bindep_distro.binaries }
+        extra.update(bin_deps)
+        bin_deps = extra
+
+    return resolve_build_order_core(sources, binary_map, build_deps, bin_deps)
+
+def create_build_schedule(distro, build_targets, arches, bindep_distro=None):
+    """Given the distribution and a list of build targets in it, get the tuples
+    of package build commands in an appropriate order."""
+
+
+def main():
+    argparser = argparse.ArgumentParser(description="Build source packages from given repository which need building")
+    argparser.add_argument("repository", help="Specifier of the repository which needs to be built")
+    argparser.add_argument("architectures", nargs='+', help="List of architectures to build for")
+    argparser.add_argument("--on-production-repository", action="store_true", help="Build even if non-development repository is specified")
+    argparser.add_argument("--bindep-base", "-B", help="Release on which binary dependency resolution is based")
+    args = argparser.parse_args()
+
+    repos = [args.repository]
+    arches = args.architectures
+    if repos == ['all']:
+        repos = [release + '-development' for release in dabuildsys.releases]
+    if not all(repo.endswith('-development') or repo.endswith('-bleeding') or repo.endswith('-staging') for repo in repos):
+        if args.on_production_repository:
+            print "WARNING: some of the repositories here are production repositories"
+        else:
+            raise BuildError("Attempting to run dabuild on a production repository")
+
+    print "Checking the out-of-date packages in following suites: " + ", ".join(repos)
+    build_targets = {}
+    distros = {}
+    for repo in repos:
+        build_targets[repo] = { arch : list() for arch in arches }
+        distros[repo] = dabuildsys.APTDistribution(repo)
+        for arch in arches:
+            for package in distros[repo].out_of_date_binaries(arch):
+                build_targets[repo][arch].append(package)
+
+    print "Attempting to resolve the build order"
+    commands = []
+    for repo in repos:
+        pass
+
+if __name__ == '__main__':
+    if not dabuildsys.claim_lock():
+        print >>sys.stderr, "The lock is in place; unable to proceed"
+        sys.exit(1)
+    try:
+        main()
+    finally:
+        dabuildsys.release_lock()
+

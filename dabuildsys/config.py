@@ -36,6 +36,9 @@ def arch_for_release(arch, release):
     # We currently don't have the infrastructure for others
     return arch == 'i386' or arch == 'amd64'
 
+# Arch on which all packages are built
+all_arch = 'amd64'
+
 source_package_dir = os.environ['DEBATHENA_SOURCE_DIR']
 orig_tarball_dir = os.environ['DEBATHENA_ORIG_DIR']
 apt_root_dir = os.environ['DEBATHENA_APT_DIR']

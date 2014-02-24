@@ -44,6 +44,7 @@ class APTSourcePackage(object):
         self.architecture = manifest['Architecture']
         self.binaries = manifest['Binary'].split(', ')
         self.manifest = manifest
+        self.relations = manifest.relations
         self.format = manifest['Format']
 
     def __str__(self):
@@ -134,7 +135,13 @@ class APTSourcePackage(object):
         # "any" is unsafe because some of the binaries may have more
         # restrictive architectures
 
-        # Actually very limited number of packages goes here
+        # Actually, very limited number of packages gets here
+        # Cache those which still do
+        try:
+            return self.cached_architectures
+        except:
+            pass
+
         control = self.get_control_file()
         binaries = {}
         for package in control:
@@ -146,10 +153,11 @@ class APTSourcePackage(object):
         if set(binaries) != set(self.binaries):
             raise BuildError("Package %s has mismatching list of binaries in dsc and control file" % self.name)
 
+        self.cached_architectures = binaries
         return binaries
 
 class APTBinaryPackage(object):
-    def __init__(self, name, version, architecture):
+    def __init__(self, name, version, architecture, manifest):
         self.name = name
         self.architecture = architecture
 
@@ -159,6 +167,9 @@ class APTBinaryPackage(object):
             self.version = Version(version.split('~')[0])
         else:
             self.version = Version(version)
+
+        self.manifest = manifest
+        self.relations = manifest.relations
 
     def __str__(self):
         return "%s:%s=%s" % (self.name, self.architecture, self.version)
@@ -195,7 +206,7 @@ class APTDistribution(object):
         for packages_file_path in glob.glob(os.path.join(self.path, '*', 'binary-*', 'Packages')):
             with open(packages_file_path, 'r') as packages_file:
                 for binary_pkg in debian.deb822.Packages.iter_paragraphs(packages_file):
-                    pkg = APTBinaryPackage(binary_pkg['Package'], binary_pkg['Version'], binary_pkg['Architecture'])
+                    pkg = APTBinaryPackage(binary_pkg['Package'], binary_pkg['Version'], binary_pkg['Architecture'], binary_pkg)
                     path = os.path.join(config.apt_root_dir, binary_pkg['Filename'])
                     pkg.file = APTFile(os.path.basename(path), path, binary_pkg['SHA256'])
                     self.binaries[pkg.name][pkg.architecture] = pkg
