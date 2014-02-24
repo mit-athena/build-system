@@ -63,4 +63,4 @@ def copy_package(pkg, from_dist, to_dist):
     """Copy a specific version of package (APTSourcePackage) from
     one distribution to another."""
 
-    call('copysrc', to_dist, from_dist, pkg.name, str(pkg.version))
+    call('-A', 'source', 'copysrc', to_dist, from_dist, pkg.name, str(pkg.version))
