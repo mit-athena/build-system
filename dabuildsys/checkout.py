@@ -78,25 +78,22 @@ class PackageCheckout(git.GitRepository):
             raise BuildError('Package source format is not quilt')
 
     def load_changelog(self):
-        log = debian.changelog.Changelog(self.get_debian_file('changelog'))
+        text = self.get_debian_file('changelog')
+        self.name, self.released, self.version_obj, self.released_version_obj = self.parse_changelog(text)
+        self.version = str(self.version_obj)
+        self.released_version = str(self.released_version_obj)
+        self.upstream_version = self.version_obj.upstream_version
 
-        self.name = log.package
-
-        self.version = log.full_version
-        self.version_obj = log.version
-        self.upstream_version = log.upstream_version
+    @staticmethod
+    def parse_changelog(text):
+        log = debian.changelog.Changelog(text)
 
         if log.distributions == 'unstable':
-            self.released = True
-            self.released_version = self.version
-            self.released_version_obj = self.version_obj
+            return log.package, True, log.version, log.version
         elif log.distributions == 'UNRELEASED':
             for change in log:
                 if change.distributions == 'unstable':
-                    self.released = False
-                    self.released_version = str(change.version)
-                    self.released_version_obj = change.version
-                    break
+                    return log.package, False, log.version, change.version
             else:
                 raise BuildError("The package has no released versions")
         else:

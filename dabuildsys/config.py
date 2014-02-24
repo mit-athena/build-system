@@ -9,7 +9,7 @@ import os
 import os.path
 
 debian_releases = ['squeeze', 'wheezy', 'jessie']
-ubuntu_releases = ['precise', 'quantal', 'raring', 'saucy']
+ubuntu_releases = ['precise', 'quantal', 'raring', 'saucy', 'trusty']
 releases = debian_releases + ubuntu_releases
 
 debian_tags = { 'squeeze' : '6.0', 'wheezy' : '7.0', 'jessie' : '8.0~0.1' }

@@ -58,3 +58,9 @@ def include_package(distro, pkg, dver):
 
     changes = "%s_%s_source.changes" % (pkg.name, dver)
     call('include', distro, os.path.join(config.source_package_dir, changes))
+
+def copy_package(pkg, from_dist, to_dist):
+    """Copy a specific version of package (APTSourcePackage) from
+    one distribution to another."""
+
+    call('copysrc', to_dist, from_dist, pkg.name, str(pkg.version))

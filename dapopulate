@@ -1,0 +1,99 @@
+#!/usr/bin/python
+
+"""
+Populate a staging repository from other APT repository, and emit
+the binary dependencies manifest.
+"""
+
+import dabuildsys
+from dabuildsys import reprepro, BuildError
+
+import argparse
+import debian.deb822
+import glob
+import os
+import sys
+
+def main():
+    argparser = argparse.ArgumentParser(description="Populates the staging pocket of given distribution")
+    argparser.add_argument('--allow-out-of-date', action='store_true', help="Include packages from APT even if there is a newer version in Git")
+    argparser.add_argument('--use-development', action='store_true', help="Use development pocket of donor instead of production")
+    argparser.add_argument('--handle-broken', choices=['ignore', 'include', 'error'], default='error',
+            help="How to handle packages with invalid structure in Git")
+    argparser.add_argument('release', choices=dabuildsys.releases, help="Release to populate")
+    argparser.add_argument('donor',   choices=dabuildsys.releases, help="Release to get packages from")
+
+    args = argparser.parse_args()
+
+    # Get the repositories involved
+    repo = dabuildsys.APTDistribution(args.release + '-staging')
+    if args.use_development:
+        _, _, donor_repo = dabuildsys.get_release(args.donor)
+    else:
+        donor_repo = dabuildsys.APTDistribution(args.donor)
+
+    # Refuse to deal with non-empty repos
+    if repo.sources or repo.binaries:
+        raise BuildError("The repository appears to be not empty, cannot populate")
+
+    # Get the list of all packages, including, in some cases, packages which are malformed
+    # or equivs (FIXME: this should be removed)
+    print "Scanning the source checkout to determine the latest released versions"
+    packages = []
+    for package_name, package_path in dabuildsys.package_map.iteritems():
+        # FIXME FIXME we need to sort this out
+        if package_name in {'libhesiod', 'cluster-cups-config', 'locker-support', 'finger-config', 'fingerd-config', 'debathena-libreadline', 'debathena-live', 'command-not-found'}:
+            continue
+        try:
+            package = dabuildsys.PackageCheckout(package_name)
+            if args.donor not in package.get_supported_releases():
+                continue
+            packages.append( (package.name, package.released_version) )
+        except BuildError as err:
+            if args.handle_broken == 'ignore':
+                pass
+            elif args.handle_broken == 'include':
+                try:
+                    with open( os.path.join(package_path, 'debian/changelog') ) as f:
+                        dch = f.read()
+                    package_name, _, _, version = dabuildsys.PackageCheckout.parse_changelog(dch)
+                    packages.append( (package_name, version) )
+                except IOError as err:
+                    # FIXME FIXME prithee FIXME
+                    if package_name != 'cviewd' and package_name != 'debathena-common':
+                        equivs_path, = glob.glob(os.path.join(package_path, '*.equivs'))
+                        with open( equivs_path ) as f:
+                            equivs = list(debian.deb822.Deb822.iter_paragraphs(f))
+                            packages.append( (package_name, debian.debian_support.Version(equivs[1]['Version']) ) )
+            else:
+                raise
+
+    # Prevent populating the repository with out-of-date packages
+    print "Checking the version consistency of donor repository against Git"
+    for package_name, version in packages:
+        donor_version = donor_repo.sources[package_name].version
+        if donor_version < version:
+            if args.allow_out_of_date:
+                print "WARNING: package %s is out-of-date in donor repository" % package_name
+            else:
+                raise BuildError("Package %s is out-of-date in donor repository" % package_name)
+        all_versions = reprepro.list_package_versions(package_name)
+        source_versions = [vers['source'] for dname, vers in all_versions.iteritems() if 'source' in vers]
+        if donor_version < max(source_versions):
+            raise BuildError("Package %s has version %s in donor, but %s exists" % (package_name, donor_version, max(source_versions)))
+
+    # Actually populate the repository
+    print "Populating %s with %i packages from %s" % (repo.name, len(packages), donor_repo.name)
+    for package_name, git_version in packages:
+        pkg = donor_repo.sources[package_name]
+        print "Copying %s from %s to %s" % (package_name, pkg.origin, repo.name)
+        reprepro.copy_package(pkg, pkg.origin, repo.name)
+
+if __name__ == '__main__':
+    if not dabuildsys.claim_lock():
+        print >>sys.stderr, "The lock is in place; unable to proceed"
+        sys.exit(1)
+    try:
+        main()
+    finally:
+        dabuildsys.release_lock()

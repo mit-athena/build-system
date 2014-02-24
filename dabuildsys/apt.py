@@ -12,6 +12,9 @@ Classes related to reading the APT repository.
 # * distribution -- tuple of release and pocket
 # * component -- same as in sources.list(5) ('debathena', 'debathena-config', etc)
 #
+# I am not sure I am actually able to stick to it though...
+# Why is the structure of this repository so complicated?
+#
 
 import config
 from checkout import PackageCheckout
@@ -182,6 +185,7 @@ class APTDistribution(object):
             with open(sources_file_path, 'r') as sources_file:
                 for source_pkg in debian.deb822.Sources.iter_paragraphs(sources_file):
                     pkg = APTSourcePackage(source_pkg['Package'], source_pkg)
+                    pkg.origin = self.name
                     basedir = os.path.join(config.apt_root_dir, source_pkg['Directory'])
                     pkg.files = [APTFile(f['name'], basedir, f['sha256']) for f in source_pkg['Checksums-Sha256']]
                     self.sources[pkg.name] = pkg
