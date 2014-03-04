@@ -61,7 +61,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
         orig_tree = checkout.get_tarball_tree(pristine_name)
         if not orig_tree:
             os.rmdir(tmpdir)
-            raise BuildError("Upstream tarball %s is not imported via pristine-tar" % pristine_name)
+            raise BuildError("Failed to extract %s from pristine-tar" % pristine_name)
         if orig_tree != ucommit.tree:
             os.rmdir(tmpdir)
             raise BuildError("Upstream tarball %s was not generated from upstream commit" % orig_tree)
