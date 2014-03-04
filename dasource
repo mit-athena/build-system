@@ -75,7 +75,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
     dcommit.extract_tree(pkgdir)
 
     try:
-        debuild_out = subprocess.check_output(['debuild', '-S', '-us', '-uc'],
+        debuild_out = subprocess.check_output(['debuild', '-S', '-us', '-uc', '-sa', '-i', '-I'],
                 stderr = subprocess.STDOUT,
                 cwd = pkgdir).strip()
     except subprocess.CalledProcessError as err:
