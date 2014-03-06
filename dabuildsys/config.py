@@ -14,6 +14,7 @@ releases = debian_releases + ubuntu_releases
 
 debian_tags = { 'wheezy' : '7.0', 'jessie' : '8.0~0.1' }
 ubuntu_tags = { 'precise' : '12.04', 'quantal' : '12.10', 'saucy' : '13.10', 'trusty' : '14.04~0.1' }
+release_tags = dict(debian_tags.items() + ubuntu_tags.items())
 
 package_search_paths = ['athena/*', 'debathena/*', 'third/*']
 package_root = os.environ['DEBATHENA_CHECKOUT_HOME']
@@ -36,12 +37,15 @@ def arch_for_release(arch, release):
     # We currently don't have the infrastructure for others
     return arch == 'i386' or arch == 'amd64'
 
+release_arches = { release : [arch for arch in arches if arch_for_release(arch, release)] for release in releases }
 # Arch on which all packages are built
 all_arch = 'amd64'
 
 source_package_dir = os.environ['DEBATHENA_SOURCE_DIR']
+binary_package_dir = os.environ['DEBATHENA_BINARY_DIR']
 orig_tarball_dir = os.environ['DEBATHENA_ORIG_DIR']
 apt_root_dir = os.environ['DEBATHENA_APT_DIR']
 lock_file_path = os.environ['DEBATHENA_LOCK_FILE']
+setup_hook_path = os.environ['DEBATHENA_SETUP_HOOK']
 
 release_tag_key = "0D8A9E8F"

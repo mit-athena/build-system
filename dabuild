@@ -1,16 +1,28 @@
 #!/usr/bin/python
 
 import dabuildsys
-from dabuildsys import reprepro, BuildError
+from dabuildsys import reprepro, BuildError, all_arch
 
-from collections import defaultdict
+from collections import OrderedDict
 from functools import partial
+from itertools import groupby
 from pprint import pprint as pp
 import argparse
 import sys
 
-def build_package(release, pkg, arch):
-    print "~BUILD %s %s" % (pkg.name, arch)
+# FIXME: there should be a sbuild-update -udcar invocation before
+def build_package(distro, release, package, arch):
+    dsc_path, = [f.path for f in package.files if f.name.endswith('.dsc')]
+    sbuild_args = []
+    sbuild_args += ['--append-to-version', '~' + dabuildsys.release_tags[release]]
+    sbuild_args += ['-d', release]
+    sbuild_args += ['--arch', arch]
+    if arch == all_arch:
+        sbuild_args += ['-A']
+    sbuild_args += ['-v']
+    sbuild_args += ['--setup-hook', dabuildsys.setup_hook_path]
+    sbuild_args += [dsc_path]
+    print "sbuild", ' '.join(sbuild_args)
 
 def union(s):
     return reduce(lambda x, y: x | y, s, frozenset())
@@ -86,19 +98,46 @@ def resolve_build_order(distro, build_targets, arches, bindep_distro=None):
 
 def create_build_schedule(distro, build_targets, arches, bindep_distro=None):
     """Given the distribution and a list of build targets in it, get the tuples
-    of package build commands in an appropriate order."""
+    of package build commands in an appropriate order.  The tuples are (repo, chroot, arch, source_name)"""
 
+    # If we are building -dev pocket, resolve build dependencies based on -proposed as well
+    if not bindep_distro and distro.pocket == 'development':
+        _, bindep_distro, _ = dabuildsys.get_release(distro.release)
+
+    order = resolve_build_order(distro, build_targets, arches, bindep_distro)
+    schedule = OrderedDict()
+    for package in order:
+        for arch in arches:
+            if package in build_targets[arch]:
+                key = (distro.name, distro.release, package)
+                if key not in schedule:
+                    schedule[key] = list()
+                schedule[key].append(arch)
+
+    for archlist in schedule.values():
+        if 'all' in archlist:
+            archlist.remove('all')
+            if all_arch not in archlist:
+                archlist.append(all_arch)
+
+    return [k + (v,) for k, v in schedule.iteritems()]
 
 def main():
     argparser = argparse.ArgumentParser(description="Build source packages from given repository which need building")
     argparser.add_argument("repository", help="Specifier of the repository which needs to be built")
-    argparser.add_argument("architectures", nargs='+', help="List of architectures to build for")
+    argparser.add_argument("architecture", nargs='*', help="List of architectures to build for")
     argparser.add_argument("--on-production-repository", action="store_true", help="Build even if non-development repository is specified")
     argparser.add_argument("--bindep-base", "-B", help="Release on which binary dependency resolution is based")
     args = argparser.parse_args()
 
     repos = [args.repository]
-    arches = args.architectures
+    arches = args.architecture
+    unknown_arches = set(arches) - set(dabuildsys.arches)
+    if unknown_arches:
+        raise BuildError("Unknown architectures: " + ', '.join(unknown_arches))
+    if all_arch in arches:
+        arches.insert(0, 'all')
+
     if repos == ['all']:
         repos = [release + '-development' for release in dabuildsys.releases]
     if not all(repo.endswith('-development') or repo.endswith('-bleeding') or repo.endswith('-staging') for repo in repos):
@@ -110,17 +149,37 @@ def main():
     print "Checking the out-of-date packages in following suites: " + ", ".join(repos)
     build_targets = {}
     distros = {}
+    distro_arches = {}
     for repo in repos:
-        build_targets[repo] = { arch : list() for arch in arches }
         distros[repo] = dabuildsys.APTDistribution(repo)
-        for arch in arches:
+        distro_arches[repo] = arches if arches else (['all'] + dabuildsys.release_arches[distros[repo].release])
+        build_targets[repo] = { arch : list() for arch in distro_arches[repo] }
+        for arch in distro_arches[repo]:
             for package in distros[repo].out_of_date_binaries(arch):
                 build_targets[repo][arch].append(package)
 
     print "Attempting to resolve the build order"
-    commands = []
+    build_list = []
     for repo in repos:
-        pass
+        build_list += create_build_schedule(distros[repo], build_targets[repo], distro_arches[repo])
+
+    print "Resolved the order"
+    print
+    for repo, order in groupby(build_list, lambda x: x[0]):
+        print "Order in %s:" % repo
+        for _, _, package, arches in order:
+            print "* %s %s [%s]" % (package, distros[repo].sources[package].version, ' '.join(arches))
+        print
+
+    sys.stdout.write("Go ahead with the build? [y/N] ")
+    sys.stdout.flush()
+    answer = raw_input().lower().strip()
+    if answer not in {'y', 'yes'}:
+        return
+
+    for repo, release, source_name, pkg_arches in build_list:
+        for arch in pkg_arches:
+            build_package(distros[repo], release, distros[repo].sources[source_name], arch)
 
 if __name__ == '__main__':
     if not dabuildsys.claim_lock():
