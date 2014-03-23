@@ -8,13 +8,16 @@ from functools import partial
 from itertools import groupby
 from pprint import pprint as pp
 import argparse
+import os.path
+import subprocess
 import sys
 
 # FIXME: there should be a sbuild-update -udcar invocation before
 def build_package(distro, release, package, arch):
     dsc_path, = [f.path for f in package.files if f.name.endswith('.dsc')]
-    sbuild_args = []
-    sbuild_args += ['--append-to-version', '~' + dabuildsys.release_tags[release]]
+    tag = '~' + dabuildsys.release_tags[release]
+    sbuild_args = ['sbuild']
+    sbuild_args += ['--append-to-version', tag]
     sbuild_args += ['-d', release]
     sbuild_args += ['--arch', arch]
     if arch == all_arch:
@@ -22,7 +25,19 @@ def build_package(distro, release, package, arch):
     sbuild_args += ['-v']
     sbuild_args += ['--setup-hook', dabuildsys.setup_hook_path]
     sbuild_args += [dsc_path]
-    print "sbuild", ' '.join(sbuild_args)
+
+    fullname = "%s_%s%s_%s" % (package.name, package.version, tag, arch)
+    sys.stdout.write("Building %s... " % fullname)
+    sys.stdout.flush()
+
+    build_dir = dabuildsys.binary_package_dir
+    changes_file = os.path.join(build_dir, fullname + '.changes')
+
+    subprocess.check_output(sbuild_args, cwd = build_dir)
+    sys.stdout.write("success! Including into %s... " % distro.name)
+    sys.stdout.flush()
+    reprepro.include_changes(distro.name, changes_file)
+    print "done."
 
 def union(s):
     return reduce(lambda x, y: x | y, s, frozenset())

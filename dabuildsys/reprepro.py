@@ -53,11 +53,16 @@ def find_source_version(package, version):
     except ValueError:
         return None
 
+def include_changes(distro, path):
+    """Includes the package with specified changes file."""
+
+    call('include', distro, path)
+
 def include_package(distro, pkg, dver):
     """Include a package and version."""
 
     changes = "%s_%s_source.changes" % (pkg.name, dver)
-    call('include', distro, os.path.join(config.source_package_dir, changes))
+    include_changes(distro, os.path.join(config.source_package_dir, changes))
 
 def copy_package(pkg, from_dist, to_dist):
     """Copy a specific version of package (APTSourcePackage) from
