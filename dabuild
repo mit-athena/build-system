@@ -177,8 +177,9 @@ def main():
 
     print "Attempting to resolve the build order"
     build_list = []
+    bindep_distro = dabuildsys.APTDistribution(args.bindep_base) if args.bindep_base else None
     for repo in repos:
-        build_list += create_build_schedule(distros[repo], build_targets[repo], distro_arches[repo])
+        build_list += create_build_schedule(distros[repo], build_targets[repo], distro_arches[repo], bindep_distro)
 
     print "Resolved the order"
     print
