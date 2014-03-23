@@ -8,6 +8,7 @@ from functools import partial
 from itertools import groupby
 from pprint import pprint as pp
 import argparse
+import datetime
 import os.path
 import subprocess
 import sys
@@ -27,7 +28,8 @@ def build_package(distro, release, package, arch):
     sbuild_args += [dsc_path]
 
     fullname = "%s_%s%s_%s" % (package.name, package.version, tag, arch)
-    sys.stdout.write("Building %s... " % fullname)
+    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+    sys.stdout.write("[%s] Building %s... " % (timestamp, fullname))
     sys.stdout.flush()
 
     build_dir = dabuildsys.binary_package_dir
