@@ -55,7 +55,7 @@ def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
     def resolve_dependencies_recursively(package, stack):
         if package in stack:
             raise BuildError("Dependency loop detected with package %s" % package)
-        return union(resolve_dependencies_recursively(pkg, stack | {package}) for pkg in bin_deps[package])
+        return union(resolve_dependencies_recursively(pkg, stack | {package}) for pkg in bin_deps[package]) | {package}
 
     all_binaries = union(binary_map.values())
 
@@ -66,14 +66,17 @@ def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
         return bin_deps_rec_cache[pkg]
 
     build_deps_rec = { srcpkg : union(get_bin_deps(binpkg) for binpkg in build_deps[srcpkg]) for srcpkg in build_deps }
+
+    # Compute binary inverses
     bin_inverse = dict()
     for srcpkg, binpkgs in binary_map.iteritems():
         for binpkg in binpkgs:
             bin_inverse[binpkg] = srcpkg
 
-    binary_space = binary_map.values()
+    build_deps_src = { srcpkg : frozenset(bin_inverse[binpkg] for binpkg in build_deps_rec[srcpkg]) & sources for srcpkg in sources }
+
     order = []
-    working_set = [(source, frozenset(bin_inverse[binpkg] for binpkg in build_deps[source])) for source in sources]
+    working_set = [(source, build_deps_src[source]) for source in sources]
     working_set.sort(key=lambda (a,b): (len(b),a))
 
     prev = -1
@@ -87,7 +90,7 @@ def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
                 order.append(pkg)
                 working_set.remove( (pkg, deps) )
             else:
-                print pkg, deps
+                pass
 
     return order
 
@@ -98,7 +101,7 @@ def resolve_build_order(distro, build_targets, arches, bindep_distro=None):
 
     sources = frozenset(union({target for target in build_targets[arch]} for arch in arches))
     binary_map = { srcpkg : frozenset(distro.sources[srcpkg].binaries) for srcpkg in distro.sources }
-    target_binaries = union(binary_map[src] for src in sources)
+    target_binaries = union(binary_map.values())
     def simplify_deps(deps):
         # Returns set of dependencies, where each dependency
         names = union({d["name"] for d in dep} for dep in deps)
