@@ -4,11 +4,6 @@
 Generate the source Debian package from the source checkout using its name.
 """
 
-# git buildpackage --git-no-ignore-new --git-upstream-tree=tag --git-upstream-tag=$$$$ -S
-# --git-debian-branch=debian --git-no-create-orig --git-export=b401e81eecdfe6fcf39bb1f421f0d2e77ce9c9e4
-
-# git tag -s 1.1.3-0debathena1 b401e81eecdfe6fcf39bb1f421f0d2e77ce9c9e4 -m "Release 1.1.3-0debathena1" -u 0D8A9E8F
-
 import dabuildsys
 from dabuildsys import BuildError
 
