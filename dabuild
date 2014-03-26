@@ -15,45 +15,70 @@ import sys
 
 # FIXME: there should be a sbuild-update -udcar invocation before
 def build_package(distro, release, package, arch):
-    dsc_path, = [f.path for f in package.files if f.name.endswith('.dsc')]
-    tag = '~' + dabuildsys.release_tags[release]
-    sbuild_args = ['sbuild']
-    sbuild_args += ['--append-to-version', tag]
-    sbuild_args += ['-d', release]
-    sbuild_args += ['--arch', arch]
-    if arch == all_arch:
-        sbuild_args += ['-A']
-    sbuild_args += ['-v']
-    sbuild_args += ['--setup-hook', dabuildsys.setup_hook_path]
-    sbuild_args += [dsc_path]
+    """
+    Build the binary package for the specified release, and include it into
+    the specified APT repository.
+    """
 
+    try:
+        dsc_path, = [f.path for f in package.files if f.name.endswith('.dsc')]
+    except:
+        raise BuildError("Source package %s has more than one dsc file" % package.name)
+
+    tag = '~' + dabuildsys.release_tags[release]
+
+    # Determine all arguments for sbuild invocation
+    sbuild_cmd = ['sbuild']
+    sbuild_cmd += ['--append-to-version', tag]
+    sbuild_cmd += ['-d', release]
+    sbuild_cmd += ['--arch', arch]
+    if arch == all_arch:
+        sbuild_cmd += ['-A']
+    sbuild_cmd += ['-v']
+    sbuild_cmd += ['--setup-hook', dabuildsys.setup_hook_path]
+    sbuild_cmd += [dsc_path]
+
+    # Indicate which package we are currently building
     fullname = "%s_%s%s_%s" % (package.name, package.version, tag, arch)
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     sys.stdout.write("[%s] Building %s... " % (timestamp, fullname))
     sys.stdout.flush()
 
+    # Determine the location where we expect the output
     build_dir = dabuildsys.binary_package_dir
     changes_file = os.path.join(build_dir, fullname + '.changes')
 
-    subprocess.check_output(sbuild_args, cwd = build_dir)
+    # Actual build happens here
+    subprocess.check_output(sbuild_cmd, cwd = build_dir)
     sys.stdout.write("success! Including into %s... " % distro.name)
     sys.stdout.flush()
+    # Import package into the repository.  Note that this has to happen in-loop,
+    # because build dependencies are fetched from the APT repository
     reprepro.include_changes(distro.name, changes_file)
     print "done."
 
 def union(s):
+    """
+    Given an iterator over sets, or objects which can be converted to sets,
+    create their union.
+    """
+
     return reduce(lambda x, y: x | y, s, frozenset())
 
 def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
-    """Given a list of source packages, map of source packages to
+    """
+    Given a list of source packages, map of source packages to
     binary packages they provide, map of build dependencies and map
     of dependencies of binaries, resolve the order in which the source
     packages need to be built.  Dependencies name are of string -> set()
-    format."""
+    format.
+    """
 
     def resolve_dependencies_recursively(package, stack):
-        """Recursively resolve binary dependencies for a single package.
-        The stack parameter is used to avoid dependency loops."""
+        """
+        Recursively resolve binary dependencies for a single package.
+        The stack parameter is used to avoid dependency loops.
+        """
 
         if package in stack:
             raise BuildError("Dependency loop detected with package %s" % package)
@@ -61,18 +86,27 @@ def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
         direct_deps = frozenset(bin_deps[package])
         # Expanded dependencies of package X is union of its direct dependencies and
         # expanded dependencies of each of its direct dependency
-        return direct_deps | union(resolve_dependencies_recursively(pkg, stack | {package}) for pkg in direct_deps)
+        return direct_deps | union(
+                resolve_dependencies_recursively(pkg, stack | {package})
+                for pkg in direct_deps
+            )
 
     bin_deps_rec_cache = {}
     def get_bin_deps(pkg):
         """Cached build dependency resolver."""
 
         if pkg not in bin_deps_rec_cache:
-            bin_deps_rec_cache[pkg] = resolve_dependencies_recursively(pkg, frozenset()) - {pkg}
+            bin_deps_rec_cache[pkg] = resolve_dependencies_recursively(pkg, frozenset())
         return bin_deps_rec_cache[pkg]
 
     # Construct { source package : its binary dependencies } map
-    build_deps_rec = { srcpkg : union(get_bin_deps(binpkg) for binpkg in build_deps[srcpkg]) for srcpkg in build_deps }
+    build_deps_rec = {
+            srcpkg : union(
+                get_bin_deps(binpkg)
+                for binpkg in build_deps[srcpkg]
+                )
+            for srcpkg in build_deps
+        }
 
     # Compute { binary package : source package providing it } map
     bin_inverse = dict()
@@ -82,11 +116,20 @@ def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
 
     # Construct { source package : source packages providing its binary dependencies } map
     # The values are filtered to contain only source packages we actually intend building
-    build_deps_src = { srcpkg : frozenset(bin_inverse[binpkg] for binpkg in build_deps_rec[srcpkg]) & sources for srcpkg in sources }
+    build_deps_src = {
+            srcpkg : frozenset(
+                bin_inverse[binpkg]
+                for binpkg in build_deps_rec[srcpkg]
+            ) & sources
+            for srcpkg in sources
+        }
 
     # Order has (package, packages to build before it) format
     order = []
-    working_set = [(source, build_deps_src[source]) for source in sources]
+    working_set = [
+            (source, build_deps_src[source])
+            for source in sources
+        ]
     # Heuristic: sort packages by the number of dependencies
     working_set.sort(key=lambda (a,b): (len(b),a))
 
@@ -114,16 +157,26 @@ def resolve_build_order(distro, build_targets, arches, bindep_distro=None):
     (source_name, architecture) """
 
     # List all source packages
-    sources = frozenset(union({target for target in build_targets[arch]} for arch in arches))
+    sources = union(
+            {target for target in build_targets[arch]}
+            for arch in arches
+        )
+
     # Create source -> provided binaries map
-    binary_map = { srcpkg : frozenset(distro.sources[srcpkg].binaries) for srcpkg in distro.sources }
+    binary_map = {
+            srcpkg : frozenset(distro.sources[srcpkg].binaries)
+            for srcpkg in distro.sources
+        }
+
     # Construct list of all known binaries
     target_binaries = union(binary_map.values())
 
     def simplify_deps(deps):
-        """Flatten the complicated structure of package build-dependencies.  It takes
+        """
+        Flatten the complicated structure of package build-dependencies.  It takes
         the horrible dict python-debian gives us and returns the set of all possible
-        dependencies."""
+        dependencies.
+        """
 
         # Note that here we transform "a or b" dependencies into "a and b"
         # This might break in some cases, but in general provides us legitimate
@@ -133,14 +186,30 @@ def resolve_build_order(distro, build_targets, arches, bindep_distro=None):
         return names & target_binaries
 
     # Construct { source package : direct binary dependencies } map
-    build_deps = { srcpkg : simplify_deps(distro.sources[srcpkg].relations['build-depends']) for srcpkg in distro.sources }
+    build_deps = {
+            srcpkg : simplify_deps(
+                distro.sources[srcpkg].relations['build-depends']
+            )
+            for srcpkg in distro.sources
+        }
     # Construct { binary package : direct binary dependencies } map
-    bin_deps   = { binpkg : union(simplify_deps(distro.binaries[binpkg][arch].relations['depends']) for arch in distro.binaries[binpkg]) for binpkg in distro.binaries }
+    bin_deps = {
+            binpkg : union(
+                simplify_deps(distro.binaries[binpkg][arch].relations['depends'])
+                for arch in distro.binaries[binpkg])
+            for binpkg in distro.binaries
+        }
 
     # Mix-in binary dependencies information from other distribution if specified
     if bindep_distro:
         # Construct { binary package : direct binary dependencies } map for extra deps
-        extra = { binpkg : union(simplify_deps(bindep_distro.binaries[binpkg][arch].relations['depends']) for arch in bindep_distro.binaries[binpkg]) for binpkg in bindep_distro.binaries }
+        extra = {
+                binpkg : union(
+                    simplify_deps(bindep_distro.binaries[binpkg][arch].relations['depends'])
+                    for arch in bindep_distro.binaries[binpkg]
+                )
+                for binpkg in bindep_distro.binaries
+            }
         # Merge two dependency maps
         extra.update(bin_deps)
         bin_deps = extra
@@ -149,8 +218,11 @@ def resolve_build_order(distro, build_targets, arches, bindep_distro=None):
     return resolve_build_order_core(sources, binary_map, build_deps, bin_deps)
 
 def create_build_schedule(distro, build_targets, arches, bindep_distro=None):
-    """Given the distribution and a list of build targets in it, get the tuples
-    of package build commands in an appropriate order.  The tuples are (repo, chroot, arch, source_name)"""
+    """
+    Given the distribution and a list of build targets in it, get the tuples
+    of package build commands in an appropriate order.  The tuples are of form
+    (repo, chroot, arch, source_name)
+    """
 
     # If we are building -dev pocket, resolve build dependencies based on -proposed as well
     if not bindep_distro and distro.pocket == 'development':

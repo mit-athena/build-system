@@ -22,6 +22,7 @@ quiet = False
 def get_version_by_autoconf(rev):
     """
     Extract package version number from autoconf files.
+    Returns (program name, version) tuple.
     """
 
     try:
@@ -64,6 +65,7 @@ def build_automake_tarball(package, version, rev, filename, generated_path, dest
 
     root = rev.repo.root
     rev.checkout()
+
     def run(*cmd):
         kwargs = {'stderr' : subprocess.STDOUT} if quiet else {}
         return subprocess.check_output(cmd, cwd = root, **kwargs)
@@ -90,7 +92,8 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False, al
     root = repo.root
     latest = repo.read_branch_head("master")
 
-    # Try autoconf and distutils
+    # Try to determine upstream version, using one of the following sources:
+    # autoconf, distutils, VERSION file
     autoconf_version = get_version_by_autoconf(latest)
     distutils_version = get_version_by_python_distutils(latest)
     if autoconf_version:
