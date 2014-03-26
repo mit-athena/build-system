@@ -27,10 +27,7 @@ def get_version_by_autoconf(rev):
     try:
         text = rev.read_file("configure.ac")
     except:
-        try:
-            text = rev.read_file("configure.in")
-        except:
-            return None
+        return None
 
     lines = text.split("\n")
     for line in lines:
