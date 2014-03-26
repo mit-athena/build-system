@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 # Globals
 quiet = False
@@ -63,16 +64,22 @@ def build_automake_tarball(package, version, rev, filename, generated_path, dest
     a redistributable tarball.
     """
 
-    root = rev.repo.root
-    rev.checkout()
+    root = tempfile.mkdtemp('upstream-tarball')
+    rev.extract_tree(root)
 
     def run(*cmd):
+        # Append schroot command to all invocations
+        cmd = ('schroot', '-c', dabuildsys.upstream_tarball_chroot, '--') + cmd
+
         kwargs = {'stderr' : subprocess.STDOUT} if quiet else {}
         return subprocess.check_output(cmd, cwd = root, **kwargs)
 
     run('autoreconf', '-fvi')
     run('./configure')
     run('make', 'distcheck')
+
+    shutil.move(os.path.join(root, filename), generated_path)
+    shutil.rmtree(root)
 
 def do_git_archive(package, version, rev, filename, generated_path, dest_path):
     """

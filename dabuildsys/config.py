@@ -48,4 +48,6 @@ apt_root_dir = os.environ['DEBATHENA_APT_DIR']
 lock_file_path = os.environ['DEBATHENA_LOCK_FILE']
 setup_hook_path = os.environ['DEBATHENA_SETUP_HOOK']
 
+upstream_tarball_chroot = 'upstream-tarball-area'
+
 release_tag_key = "0D8A9E8F"
