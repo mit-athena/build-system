@@ -41,9 +41,6 @@ def main():
     print "Scanning the source checkout to determine the latest released versions"
     packages = []
     for package_name, package_path in dabuildsys.package_map.iteritems():
-        # FIXME FIXME we need to sort this out
-        if package_name in {'libhesiod', 'cluster-cups-config', 'locker-support', 'finger-config', 'fingerd-config', 'debathena-libreadline', 'debathena-live', 'command-not-found'}:
-            continue
         try:
             package = dabuildsys.PackageCheckout(package_name)
             if args.donor not in package.get_supported_releases():
@@ -60,11 +57,11 @@ def main():
                     packages.append( (package_name, version) )
                 except IOError as err:
                     # FIXME FIXME prithee FIXME
-                    if package_name != 'cviewd' and package_name != 'debathena-common':
-                        equivs_path, = glob.glob(os.path.join(package_path, '*.equivs'))
-                        with open( equivs_path ) as f:
-                            equivs = list(debian.deb822.Deb822.iter_paragraphs(f))
-                            packages.append( (package_name, debian.debian_support.Version(equivs[1]['Version']) ) )
+                    # This code should be gone once equivs packages are gone
+                    equivs_path, = glob.glob(os.path.join(package_path, '*.equivs'))
+                    with open( equivs_path ) as f:
+                        equivs = list(debian.deb822.Deb822.iter_paragraphs(f))
+                        packages.append( (package_name, debian.debian_support.Version(equivs[1]['Version']) ) )
             else:
                 raise
 
