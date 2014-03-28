@@ -103,7 +103,7 @@ def resolve_build_order_core(sources, binary_map, build_deps, bin_deps):
     # Construct { source package : its binary dependencies } map
     build_deps_rec = {
             srcpkg : union(
-                get_bin_deps(binpkg)
+                get_bin_deps(binpkg) | {binpkg}
                 for binpkg in build_deps[srcpkg]
                 )
             for srcpkg in build_deps
