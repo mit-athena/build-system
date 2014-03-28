@@ -35,6 +35,7 @@ def build_package(distro, release, package, arch):
     if arch == all_arch:
         sbuild_cmd += ['-A']
     sbuild_cmd += ['-v']
+    sbuild_cmd += ['--resolve-alternatives']
     sbuild_cmd += ['--setup-hook', dabuildsys.setup_hook_path]
     sbuild_cmd += [dsc_path]
 
