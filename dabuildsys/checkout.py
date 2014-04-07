@@ -191,7 +191,7 @@ class PackageCheckout(git.GitRepository):
 
         releases = set(config.releases)
         if 'X-Debathena-Build-For' in control:
-            releases &= control['X-Debathena-Build-For'].split(' ')
+            releases &= set(control['X-Debathena-Build-For'].split(' '))
 
         if 'X-Debathena-No-Build' in control:
             releases -= set(control['X-Debathena-No-Build'].split(' '))
