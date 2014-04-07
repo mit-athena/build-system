@@ -189,10 +189,10 @@ class PackageCheckout(git.GitRepository):
         for block in debian.deb822.Deb822.iter_paragraphs(self.get_debian_file('control').split("\n")):
             control.update(block)
 
-        if 'X-Debathena-Build-For' in control:
-            return control['X-Debathena-Build-For'].split(' ')
-
         releases = set(config.releases)
+        if 'X-Debathena-Build-For' in control:
+            releases &= control['X-Debathena-Build-For'].split(' ')
+
         if 'X-Debathena-No-Build' in control:
             releases -= set(control['X-Debathena-No-Build'].split(' '))
 
