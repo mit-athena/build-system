@@ -1,0 +1,199 @@
+#!/usr/bin/python
+
+"""
+If invoked as "dareprepro", it is a simple wrapper around reprepro.
+If invoked as "damove", "dacopy", or "daremove", it performs those
+operations, enforcing our repository workflow.
+"""
+
+import dabuildsys
+from dabuildsys import config, reprepro
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+
+# Maybe this should move into config?
+suffix_operations = { 'production': (),
+                      'proposed': ('production'),
+                      'development': ('proposed'),
+                      'bleeding': (),
+                      'staging': ()
+                      }
+
+# Remove deprecated syntax in Jun 2015, along with
+# fix_deprecated() below
+deprecated_suffix=re.compile('^-([A-Za-z]{2,})$')
+
+def notify(msg):
+    """Notify something that the operation succeeded.
+
+    In this case, notify using zwrite"""
+    cmdline = ['zwrite', '-d', '-c', 'debathena', '-i', 'apt', '-m']
+    try:
+        subprocess.check_call(cmdline + [msg])
+    except subprocess.CalledProcessError as e:
+        print >>sys.stderr, "Unable to notify: ", e.message
+
+def distro(pocket, release):
+    """Given a pocket (e.g. "proposed") and a release,
+    concatenate them in a useful manner"""
+    assert pocket in suffix_operations
+    # Yes, I know we just deprecated '', but I want the command line to
+    # be clear about what is going on, and not rely on how we have our
+    # apt repo laid out at the moment.
+    if pocket == 'production':
+        return release
+    else:
+        return "{0}-{1}".format(release, pocket)
+
+def validate_suffixes(*suffixes):
+    """Validate suffixes/pockets, failing if it encounters an
+    unknown one."""
+    for s in suffixes:
+        if s not in suffix_operations:
+            sys.exit("Unknown suffix: {0}".format(s))
+    return suffixes
+
+# Remove in Jun 2015
+def fix_deprecated(arg):
+    """Support for the old build system syntax."""
+    if arg == '':
+        print >>sys.stderr, "W: Deprecated syntax: use 'production', not ''"
+        return 'production'
+    is_suffix = deprecated_suffix.match(arg)
+    if is_suffix is not None and is_suffix.group(1) in suffix_operations:
+        print >>sys.stderr, \
+            "W: Deprecated syntax: omit leading '-' from pockets"
+        return is_suffix.group(1)
+    return arg
+
+def yesreally():
+    """Confirm that the user really does want to shoot themselves
+    in the foot."""
+    try:
+        if raw_input("This is a terrible idea.  "
+                     "Continue anyway? [y/N] ").lower() == 'y':
+            return True
+        sys.exit("You have chosen wisely.")
+    except (EOFError, KeyboardInterrupt):
+        sys.exit("\nYou could have just typed 'N'...")
+    return False
+
+
+def dacopy(moving=False):
+    """Copy (or move, if moving=True) source packages from
+    one pocket to another, enforcing workflow."""
+    verb, participle = ("move" if moving else "copy",
+                        "Moving" if moving else "Copying")
+    parser = argparse.ArgumentParser(
+        description="{0} packages from one pocket to another".format(
+            verb.capitalize()))
+    parser.add_argument("--bad-idea", action="store_true",
+                        dest="override", help=argparse.SUPPRESS)
+    parser.add_argument("dst", metavar="TO_POCKET",
+                        help="Destination pocket (e.g. 'production'")
+    parser.add_argument("src", metavar="FROM_POCKET",
+                        help="Souce pocket (e.g. 'proposed'")
+    parser.add_argument("packages", nargs='+', metavar='SRCPKG',
+                        help="Source package name(s)")
+    args = parser.parse_args([fix_deprecated(x) for x in sys.argv[1:]])
+    dst, src = validate_suffixes(args.dst, args.src)
+    if dst not in suffix_operations[src]:
+        print >>sys.stderr, \
+            "WARNING: {participle} a package from '{src}' to '{dst}'\n" \
+            "         is not an approved workflow.".format(
+            src=src, dst=dst, participle=participle)
+        if src in suffix_operations[dst]:
+            print >>sys.stderr, \
+                "         (Ensure the source and destination are not reversed.)"
+        if not (args.override and yesreally()):
+            sys.exit(1)
+    for package in args.packages:
+        success, fail = [], []
+        for r in config.releases:
+            if run_reprepro('copysrc', distro(dst, r),
+                            distro(src, r), package):
+                if (not moving) or \
+                        (moving and
+                         run_reprepro('removesrc', distro(src, r), package)):
+                    success.append(r)
+                    continue
+            fail.append(r)
+        if len(fail) > 0:
+            print >>sys.stderr, "FAILED to {verb} {pkg} for: {suites}".format(
+                verb=verb, pkg=package, suites=fail)
+            if package != args.packages[-1]:
+                if raw_input('Keep going? [y/N] ').lower() != 'y':
+                    sys.exit(1)
+        elif moving:
+            notify("Moved {0} from {1} to {2} for\n{3}".format(package,
+                                                               src, dst,
+                                                               success))
+
+def damove():
+    dacopy(moving=True)
+
+def daremove():
+    """Remove a source package from a pocket"""
+    parser = argparse.ArgumentParser(
+        description="Remove packages from a pocket")
+    parser.add_argument("--bad-idea", action="store_true",
+                        dest="override", help=argparse.SUPPRESS)
+    parser.add_argument("src", metavar="FROM", help="Old suffix")
+    parser.add_argument("packages", nargs='+', metavar='SRCPKG',
+                        help="Source package name(s)")
+    args = parser.parse_args([fix_deprecated(x) for x in sys.argv[1:]])
+    src = validate_suffixes(args.src)[0]
+    if src == 'production':
+        print >>sys.stderr, "You should not delete packages from production."
+        if not (args.override and yesreally()):
+            sys.exit("Aborting...")
+    for package in args.packages:
+        success, fail = [], []
+        for r in config.releases:
+            if run_reprepro('removesrc', distro(src, r), package):
+                success.append(r)
+            else:
+                fail.append(r)
+        if len(fail) > 0:
+            print >>sys.stderr, "FAILED to move {0} for: {1}".format(package,
+                                                                     fail)
+            if package != args.packages[-1]:
+                if raw_input('Keep going? [y/N] ').lower() != 'y':
+                    sys.exit(1)
+
+def run_reprepro(*args):
+    """Call reprepro, displaying output, and returning True
+    if it succeeded, else False"""
+    try:
+        print reprepro.call(*args)
+        return True
+    except subprocess.CalledProcessError as e:
+        print >>sys.stderr, e.output
+        return False
+
+
+def main():
+    """A state in New England"""
+    dispatch = { 'dacopy': dacopy,
+                 'damove': damove,
+                 'daremove': daremove }
+    invoked_as = os.path.basename(sys.argv[0])
+    if invoked_as in dispatch:
+        dispatch[invoked_as]()
+    else:
+        if not run_reprepro(*sys.argv[1:]):
+            sys.exit(1)
+    sys.exit(0)
+
+if __name__ == '__main__':
+    if not dabuildsys.claim_lock():
+        print >>sys.stderr, "The lock is in place; unable to proceed"
+        sys.exit(1)
+    try:
+        main()
+    finally:
+        dabuildsys.release_lock()
