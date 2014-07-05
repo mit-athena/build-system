@@ -56,11 +56,13 @@ class APTSourcePackage(object):
     def get_control_file(self):
         """Extract control file from the source package."""
 
+        controlname = "%s-%s/debian/control" % (self.name, str(self.version))
         if self.format.startswith('3.0'):
             if self.format == '3.0 (native)':
                 tarname = "%s_%s.tar." % (self.name, str(self.version))
             elif self.format == '3.0 (quilt)':
                 tarname = "%s_%s.debian.tar." % (self.name, str(self.version))
+                controlname = "debian/control"
             else:
                 raise BuildError("Package %s has unsupported format %s in archive" % (self.name, self.format))
 
@@ -71,7 +73,7 @@ class APTSourcePackage(object):
 
             with tarfile.open(tarpath, 'r:*') as tar:
                 return list(debian.deb822.Deb822.iter_paragraphs(
-                    tar.extractfile('debian/control')  ))
+                    tar.extractfile(controlname)  ))
 
         # FIXME: this code should be gone once 1.0 packages are gone
         # I still can't believe I actually wrote this
@@ -82,7 +84,6 @@ class APTSourcePackage(object):
                 except:
                     raise BuildError("Package %s has format 1.0 and does not seem to have the tarball" % self.name)
 
-                controlname = "%s-%s/debian/control" % (self.name, str(self.version))
                 with tarfile.open(tarpath, 'r:*') as tar:
                     return list(debian.deb822.Deb822.iter_paragraphs(
                         tar.extractfile(controlname)  ))
