@@ -76,8 +76,7 @@ class GitRepository(object):
         in case if two revisions are equal."""
 
         try:
-            self.git('merge-base', '--is-ancestor', rev_older, rev_newer)
-            return True
+            return self.git('merge-base', rev_older, rev_newer) == rev_older
         except subprocess.CalledProcessError as err:
             if err.returncode == 1:
                 return False
