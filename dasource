@@ -31,7 +31,7 @@ def build_source_package(checkout, dver, uver, allow_overwrite=False, keep_temp=
     files_dst = map(partial(os.path.join, dabuildsys.source_package_dir), files)
     pkgname = "%s-%s" % (checkout.name, uver)
 
-    if not allow_overwrite and any(os.path.exists(f) for f in files_dst):
+    if not allow_overwrite and any(os.path.exists(f) for f in files_dst if not f.endswith('.tar.gz')):
         raise BuildErrorNotReally("%s already has a built version in source packages directory" % pkgname)
 
     tmpdir = tempfile.mkdtemp('dabuildsys')
