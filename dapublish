@@ -54,7 +54,7 @@ def publish_package(pkg):
     if not pkg.native and 'refs/heads/pristine-tar' in remote_refs:
         local_pristine_tar  = pkg.get_rev(local_refs ['refs/heads/pristine-tar'])
         remote_pristine_tar = pkg.get_rev(remote_refs['refs/heads/pristine-tar'])
-        if not (remote_pristine_tar < local_pristine_tar):
+        if not (remote_pristine_tar <= local_pristine_tar):
             raise BuildError("Local pristine-tar branch is not ahead the remote one")
 
     # Check reprepro
