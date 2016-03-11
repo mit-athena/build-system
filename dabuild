@@ -312,7 +312,11 @@ if __name__ == '__main__':
         print >>sys.stderr, "The lock is in place; unable to proceed"
         sys.exit(1)
     try:
-        main()
+        try:
+            main()
+        except subprocess.CalledProcessError as err:
+            print err.output
+            raise err
     finally:
         dabuildsys.release_lock()
 
