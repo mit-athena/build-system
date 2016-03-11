@@ -101,6 +101,7 @@ def main():
         except Exception as err:
             failed.append(checkout.name)
             print >>sys.stderr, "Failed to build package %s: %s" % (checkout.name, err)
+            print err.output
         print
 
     if published:
