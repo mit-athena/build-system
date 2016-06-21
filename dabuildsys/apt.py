@@ -68,7 +68,7 @@ class APTSourcePackage(object):
 
             try:
                 tarpath, = [f.path for f in self.files if f.name.startswith(tarname)]
-            except:
+            except ValueError:
                 raise BuildError("File %s.{gz,bz2,xz} not found for package %s" % (tarname, self.name))
 
             with tarfile.open(tarpath, 'r:*') as tar:
@@ -81,7 +81,7 @@ class APTSourcePackage(object):
             if len(self.files) == 2:
                 try:
                     tarpath, = [f.path for f in self.files if f.name.endswith('.tar.gz')]
-                except:
+                except ValueError:
                     raise BuildError("Package %s has format 1.0 and does not seem to have the tarball" % self.name)
 
                 with tarfile.open(tarpath, 'r:*') as tar:
@@ -91,7 +91,7 @@ class APTSourcePackage(object):
                 diffname = "%s_%s.diff.gz" % (self.name, str(self.version))
                 try:
                     diffpath, = [f.path for f in self.files if f.name == diffname]
-                except:
+                except ValueError:
                     raise BuildError("File %s not found for package %s" % (diffname, self.name))
 
                 diff = gzip.open(diffpath, 'r')
@@ -140,7 +140,7 @@ class APTSourcePackage(object):
         # Cache those which still do
         try:
             return self.cached_architectures
-        except:
+        except AttributeError:
             pass
 
         control = self.get_control_file()
@@ -303,7 +303,7 @@ def compare_against_git(apt_repo, update_all=False, checkout_cache=None):
                 checkout = checkout_cache[package]
                 if not checkout:
                     continue
-            except:
+            except KeyError:
                 checkout = PackageCheckout(package, full_clean=update_all)
                 if use_cache:
                     checkout_cache[package] = checkout

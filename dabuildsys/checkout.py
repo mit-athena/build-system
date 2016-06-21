@@ -59,7 +59,7 @@ class PackageCheckout(git.GitRepository):
     def validate_native(self):
         try:
             source_format = self.get_debian_file('source/format')
-        except:
+        except subprocess.CalledProcessError:
             raise BuildError('Package does not specify the source format')
 
         if source_format != '3.0 (native)':

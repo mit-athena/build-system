@@ -28,7 +28,7 @@ def get_version_by_autoconf(rev):
 
     try:
         text = rev.read_file("configure.ac")
-    except:
+    except subprocess.CalledProcessError:
         return None
 
     lines = text.split("\n")
@@ -50,7 +50,7 @@ def get_version_by_python_distutils(rev):
 
     try:
         text = rev.read_file("setup.py")
-    except:
+    except subprocess.CalledProcessError:
         return None
 
     root = rev.repo.root
@@ -118,14 +118,14 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False, al
     else:
         try:
             version = latest.read_file("VERSION")
-        except:
+        except subprocess.CalledProcessError:
             raise BuildError("No VERSION file found, and no other way to determine current version was provided")
         method = 'git archive'
 
     # The tag must exist in order for build to succeed
     try:
         tagged = repo.read_tag(version)
-    except:
+    except subprocess.CalledProcessError:
         raise BuildError("Unable to find the tag corresponding to version %s" % version)
 
     # Determine the relevant filenames and paths

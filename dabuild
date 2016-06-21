@@ -22,7 +22,7 @@ def build_package(distro, release, package, arch):
 
     try:
         dsc_path, = [f.path for f in package.files if f.name.endswith('.dsc')]
-    except:
+    except ValueError:
         raise BuildError("Source package %s has more than one dsc file" % package.name)
 
     tag = '~' + dabuildsys.release_tags[release]
@@ -316,7 +316,7 @@ if __name__ == '__main__':
             main()
         except subprocess.CalledProcessError as err:
             print err.output
-            raise err
+            raise
     finally:
         dabuildsys.release_lock()
 
