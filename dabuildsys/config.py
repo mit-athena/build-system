@@ -9,7 +9,7 @@ import os
 import os.path
 
 debian_releases = ['wheezy', 'jessie']
-ubuntu_releases = ['precise', 'trusty', 'wily']
+ubuntu_releases = ['precise', 'trusty', 'wily', 'xenial']
 releases = debian_releases + ubuntu_releases
 
 debian_tags = { 'wheezy' : 'debian7.0', 'jessie' : 'debian8.0~0.2' }
@@ -17,6 +17,7 @@ ubuntu_tags = {
 	'precise' : 'ubuntu12.04',
 	'trusty' : 'ubuntu14.04',
 	'wily' : 'ubuntu15.10~0.1',
+	'xenial' : 'ubuntu16.04~0.1',
 }
 release_tags = dict(debian_tags.items() + ubuntu_tags.items())
 
