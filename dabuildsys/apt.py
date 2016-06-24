@@ -303,7 +303,7 @@ def compare_against_git(apt_repo, update_all=False, checkout_cache=None):
                 checkout = checkout_cache[package]
                 if not checkout:
                     continue
-            except KeyError:
+            except (TypeError, KeyError):
                 checkout = PackageCheckout(package, full_clean=update_all)
                 if use_cache:
                     checkout_cache[package] = checkout
