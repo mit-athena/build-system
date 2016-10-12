@@ -89,7 +89,7 @@ def do_git_archive(package, version, rev, filename, generated_path, dest_path):
     fullname = "%s-%s" % (package, version)
     rev.repo.git('archive', '--prefix=%s/' % fullname, '--output=%s' % filename, rev.hash)
 
-def build_upstream_tarball(package, do_build = True, do_pristine_tar = False, allow_override = False):
+def build_upstream_tarball(package, do_build = True, do_pristine_tar = False, allow_override = False, force_version = None):
     """
     Build a correct redistributable release of non-Debian-specific package.
     """
@@ -121,6 +121,9 @@ def build_upstream_tarball(package, do_build = True, do_pristine_tar = False, al
         except subprocess.CalledProcessError:
             raise BuildError("No VERSION file found, and no other way to determine current version was provided")
         method = 'git archive'
+
+    if force_version is not None:
+        version = force_version
 
     # The tag must exist in order for build to succeed
     try:
@@ -168,6 +171,7 @@ def main():
     argparser.add_argument("--pristine-tar", "-p", action="store_true", help="Commit the tarball to the Git repo")
     argparser.add_argument("--only-pristine-tar", "-P", action="store_true", help="Do not build the tarball, only commit it")
     argparser.add_argument("--yes-please-do-override-my-pristine-tar", action="store_true", help="Do not quit if pristine-tar is checked in")
+    argparser.add_argument("--force-version", help="Override the detected version number")
     args = argparser.parse_args()
 
     global quiet
@@ -176,7 +180,7 @@ def main():
     do_build = not args.only_pristine_tar
     do_pristine_tar = args.pristine_tar or args.only_pristine_tar
 
-    build_upstream_tarball(args.package, do_build, do_pristine_tar, args.yes_please_do_override_my_pristine_tar)
+    build_upstream_tarball(args.package, do_build, do_pristine_tar, args.yes_please_do_override_my_pristine_tar, args.force_version)
 
 if __name__ == '__main__':
     if not dabuildsys.claim_lock():
