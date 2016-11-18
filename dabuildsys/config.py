@@ -8,11 +8,18 @@ from glob import glob
 import os
 import os.path
 
-debian_releases = ['wheezy', 'jessie']
+# If you edit these releases and tags, please also update
+# debian-versions.sh in scripts.git (checked out at /mit/debathena/bin).
+
+debian_releases = ['wheezy', 'jessie', 'stretch']
 ubuntu_releases = ['precise', 'trusty', 'wily', 'xenial']
 releases = debian_releases + ubuntu_releases
 
-debian_tags = { 'wheezy' : 'debian7.0', 'jessie' : 'debian8.0~0.2' }
+debian_tags = {
+    'wheezy' : 'debian7.0',
+    'jessie' : 'debian8.0',
+    'stretch' : 'debian9.0~0.1',
+}
 ubuntu_tags = {
 	'precise' : 'ubuntu12.04',
 	'trusty' : 'ubuntu14.04',
