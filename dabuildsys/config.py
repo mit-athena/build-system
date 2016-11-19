@@ -12,7 +12,7 @@ import os.path
 # debian-versions.sh in scripts.git (checked out at /mit/debathena/bin).
 
 debian_releases = ['wheezy', 'jessie', 'stretch']
-ubuntu_releases = ['precise', 'trusty', 'wily', 'xenial']
+ubuntu_releases = ['precise', 'trusty', 'xenial']
 releases = debian_releases + ubuntu_releases
 
 debian_tags = {
@@ -23,7 +23,6 @@ debian_tags = {
 ubuntu_tags = {
 	'precise' : 'ubuntu12.04',
 	'trusty' : 'ubuntu14.04',
-	'wily' : 'ubuntu15.10~0.1',
 	'xenial' : 'ubuntu16.04~0.1',
 }
 release_tags = dict(debian_tags.items() + ubuntu_tags.items())
