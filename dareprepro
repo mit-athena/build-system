@@ -112,38 +112,40 @@ def dacopy(moving=False):
         if not (args.override and yesreally()):
             sys.exit(1)
     to_export = []
-    for package in args.packages:
-        success, fail = [], []
-        for r in config.releases:
-            try:
-                out = reprepro.call('--export=never', 'copysrc', distro(dst, r), distro(src, r),
-                                    package)
-                if distro(dst, r) not in to_export:
-                    to_export.append(distro(dst, r))
-                print out
-                if out.startswith('Nothing to do'):
-                    continue
-                if (not moving) or \
-                        (moving and
-                         run_reprepro('--export=never', 'removesrc', distro(src, r), package)):
-                    if moving and distro(src, r) not in to_export:
-                        to_export.append(distro(src, r))
-                    success.append(r)
-                    continue
-            except subprocess.CalledProcessError as e:
-                print >>sys.stderr, e.output
-            fail.append(r)
-        if len(fail) > 0:
-            print >>sys.stderr, "FAILED to {verb} {pkg} for: {suites}".format(
-                verb=verb, pkg=package, suites=fail)
-            if package != args.packages[-1]:
-                if raw_input('Keep going? [y/N] ').lower() != 'y':
-                    sys.exit(1)
-        elif moving:
-            notify("Moved {0} from {1} to {2} for\n{3}".format(package,
-                                                               src, dst,
-                                                               success))
-    print reprepro.call('export', *to_export)
+    try:
+        for package in args.packages:
+            success, fail = [], []
+            for r in config.releases:
+                try:
+                    out = reprepro.call('--export=never', 'copysrc', distro(dst, r), distro(src, r),
+                                        package)
+                    if distro(dst, r) not in to_export:
+                        to_export.append(distro(dst, r))
+                    print out
+                    if out.startswith('Nothing to do'):
+                        continue
+                    if (not moving) or \
+                            (moving and
+                             run_reprepro('--export=never', 'removesrc', distro(src, r), package)):
+                        if moving and distro(src, r) not in to_export:
+                            to_export.append(distro(src, r))
+                        success.append(r)
+                        continue
+                except subprocess.CalledProcessError as e:
+                    print >>sys.stderr, e.output
+                fail.append(r)
+            if len(fail) > 0:
+                print >>sys.stderr, "FAILED to {verb} {pkg} for: {suites}".format(
+                    verb=verb, pkg=package, suites=fail)
+                if package != args.packages[-1]:
+                    if raw_input('Keep going? [y/N] ').lower() != 'y':
+                        sys.exit(1)
+            elif moving:
+                notify("Moved {0} from {1} to {2} for\n{3}".format(package,
+                                                                   src, dst,
+                                                                   success))
+    finally:
+        print reprepro.call('export', *to_export)
 
 def damove():
     dacopy(moving=True)
