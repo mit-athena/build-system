@@ -81,10 +81,13 @@ def main():
 
     # Actually populate the repository
     print "Populating %s with %i packages from %s" % (repo.name, len(packages), donor_repo.name)
-    for package_name, git_version in packages:
-        pkg = donor_repo.sources[package_name]
-        print "Copying %s from %s to %s" % (package_name, pkg.origin, repo.name)
-        reprepro.copy_package(pkg, pkg.origin, repo.name)
+    try:
+        for package_name, git_version in packages:
+            pkg = donor_repo.sources[package_name]
+            print "Copying %s from %s to %s" % (package_name, pkg.origin, repo.name)
+            reprepro.copy_package(pkg, pkg.origin, repo.name, export=False)
+    finally:
+        print reprepro.call('export')
 
 if __name__ == '__main__':
     if not dabuildsys.claim_lock():
