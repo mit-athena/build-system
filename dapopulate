@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 """
-Populate a staging repository from other APT repository, and emit
+Populate a development repository from other APT repository, and emit
 the binary dependencies manifest.
 """
 
@@ -15,7 +15,7 @@ import os
 import sys
 
 def main():
-    argparser = argparse.ArgumentParser(description="Populates the staging pocket of given distribution")
+    argparser = argparse.ArgumentParser(description="Populates the development pocket of given distribution")
     argparser.add_argument('--allow-out-of-date', action='store_true', help="Include packages from APT even if there is a newer version in Git")
     argparser.add_argument('--use-development', action='store_true', help="Use development pocket of donor instead of production")
     argparser.add_argument('--handle-broken', choices=['ignore', 'include', 'error'], default='error',
@@ -26,7 +26,7 @@ def main():
     args = argparser.parse_args()
 
     # Get the repositories involved
-    repo = dabuildsys.APTDistribution(args.release + '-staging')
+    repo = dabuildsys.APTDistribution(args.release + '-development')
     if args.use_development:
         _, _, donor_repo = dabuildsys.get_release(args.donor)
     else:
