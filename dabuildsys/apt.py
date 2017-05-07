@@ -22,9 +22,11 @@ from common import BuildError
 
 from debian.debian_support import Version
 from collections import defaultdict
+from contextlib import closing
 import debian.deb822
 import glob
 import gzip
+import lzma
 import os.path
 import re
 import tarfile
@@ -71,9 +73,11 @@ class APTSourcePackage(object):
             except ValueError:
                 raise BuildError("File %s.{gz,bz2,xz} not found for package %s" % (tarname, self.name))
 
-            with tarfile.open(tarpath, 'r:*') as tar:
-                return list(debian.deb822.Deb822.iter_paragraphs(
-                    tar.extractfile(controlname)  ))
+            with closing(lzma.LZMAFile(tarpath, 'r')) if tarpath.endswith('.xz') \
+                 else open(tarpath, 'r') as uncompressed:
+                with tarfile.open(fileobj=uncompressed, mode='r:*') as tar:
+                    return list(debian.deb822.Deb822.iter_paragraphs(
+                        tar.extractfile(controlname)  ))
 
         # FIXME: this code should be gone once 1.0 packages are gone
         # I still can't believe I actually wrote this
