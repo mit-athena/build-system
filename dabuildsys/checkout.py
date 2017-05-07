@@ -173,10 +173,10 @@ class PackageCheckout(git.GitRepository):
         if include_manifest:
             extras += ["%s.debathena"]
         if self.native:
-            return [s % package_name for s in ["%s.dsc", "%s.tar.gz" ] + extras]
+            return [s % package_name for s in ["%s.dsc", "%s.tar.xz" ] + extras]
         else:
-            orig = "%s_%s.orig.tar.gz" % (self.name, extract_upstream_version(version))
-            return [s % package_name for s in ["%s.dsc", "%s.debian.tar.gz"] + extras] + [orig]
+            orig = "%s_%s.orig.tar.xz" % (self.name, extract_upstream_version(version))
+            return [s % package_name for s in ["%s.dsc", "%s.debian.tar.xz"] + extras] + [orig]
 
     def get_supported_releases(self):
         """Returns the list of releases for which package is still built."""
