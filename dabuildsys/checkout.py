@@ -175,7 +175,7 @@ class PackageCheckout(git.GitRepository):
         if self.native:
             return [s % package_name for s in ["%s.dsc", "%s.tar.xz" ] + extras]
         else:
-            orig = "%s_%s.orig.tar.xz" % (self.name, extract_upstream_version(version))
+            orig = "%s_%s.orig.tar.gz" % (self.name, extract_upstream_version(version))
             return [s % package_name for s in ["%s.dsc", "%s.debian.tar.xz"] + extras] + [orig]
 
     def get_supported_releases(self):
