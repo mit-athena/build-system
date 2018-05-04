@@ -87,7 +87,7 @@ def main():
             print "Copying %s from %s to %s" % (package_name, pkg.origin, repo.name)
             reprepro.copy_package(pkg, pkg.origin, repo.name, export=False)
     finally:
-        print reprepro.call('export')
+        print reprepro.call('export', repo.name)
 
 if __name__ == '__main__':
     if not dabuildsys.claim_lock():
