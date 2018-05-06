@@ -165,14 +165,8 @@ class APTBinaryPackage(object):
     def __init__(self, name, version, architecture, manifest):
         self.name = name
         self.architecture = architecture
-
-        # We do not need ~ubuntu-version suffix here
         self.full_version = version
-        if '~' in version:
-            self.version = Version(version.split('~')[0])
-        else:
-            self.version = Version(version)
-
+        self.version = Version(version)
         self.manifest = manifest
         self.relations = manifest.relations
 
@@ -265,11 +259,12 @@ class APTDistribution(object):
 
                 # Actually compare versions
                 bin_pkg = bin_pkgs[arch]
-                if bin_pkg.version > src_pkg.version:
+                target_version = Version(src_pkg.version.full_version + '~' + config.release_tags[self.release])
+                if bin_pkg.version > target_version:
                     # Circumvent edge cases of version comparison with manual-config packages
                     if not (name.startswith('debathena-manual-') and name.endswith('-config')):
                         raise BuildError("Package %s has version higher in binary than in source" % bin_pkg.name)
-                if src_pkg.version > bin_pkg.version:
+                if target_version > bin_pkg.version:
                     out_of_date = True
                     continue
 
