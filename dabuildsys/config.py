@@ -18,14 +18,14 @@ releases = debian_releases + ubuntu_releases
 debian_tags = {
     'wheezy' : 'debian7.0',
     'jessie' : 'debian8.0',
-    'stretch' : 'debian9.0~0.1',
+    'stretch' : 'debian9.0',
 }
 ubuntu_tags = {
 	'precise' : 'ubuntu12.04',
 	'trusty' : 'ubuntu14.04',
-	'xenial' : 'ubuntu16.04~0.1',
-	'artful' : 'ubuntu17.10~0.1',
-	'bionic' : 'ubuntu18.04~0.1',
+	'xenial' : 'ubuntu16.04',
+	'artful' : 'ubuntu17.10',
+	'bionic' : 'ubuntu18.04',
 }
 release_tags = dict(debian_tags.items() + ubuntu_tags.items())
 
