@@ -11,20 +11,16 @@ import os.path
 # If you edit these releases and tags, please also update
 # debian-versions.sh in scripts.git (checked out at /mit/debathena/bin).
 
-debian_releases = ['wheezy', 'jessie', 'stretch']
-ubuntu_releases = ['precise', 'trusty', 'xenial', 'artful', 'bionic']
+debian_releases = ['stretch', 'buster']
+ubuntu_releases = ['xenial', 'bionic']
 releases = debian_releases + ubuntu_releases
 
 debian_tags = {
-    'wheezy' : 'debian7.0',
-    'jessie' : 'debian8.0',
     'stretch' : 'debian9.0',
+    'buster'  : 'debian10.0',
 }
 ubuntu_tags = {
-	'precise' : 'ubuntu12.04',
-	'trusty' : 'ubuntu14.04',
 	'xenial' : 'ubuntu16.04',
-	'artful' : 'ubuntu17.10',
 	'bionic' : 'ubuntu18.04',
 }
 release_tags = dict(debian_tags.items() + ubuntu_tags.items())
