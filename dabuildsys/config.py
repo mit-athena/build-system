@@ -17,7 +17,7 @@ releases = debian_releases + ubuntu_releases
 
 debian_tags = {
     'stretch' : 'debian9.0',
-    'buster'  : 'debian10.0',
+    'buster'  : 'debian10.0~0.1',
 }
 ubuntu_tags = {
 	'xenial' : 'ubuntu16.04',
